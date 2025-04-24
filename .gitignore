@@ -168,3 +168,4 @@ cython_debug/
 *.xlsx
 *.json
 gcloud_template.cfg
+*.env
