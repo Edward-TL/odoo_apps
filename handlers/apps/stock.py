@@ -30,6 +30,47 @@ class StockManager:
             return location_ids[0]
         return False
 
+    
+    def create_product_category(self, category_name: str, parent_id: int = False):
+        """
+        Crea una nueva categoría de producto en Odoo.
+
+        Args:
+            client: Una instancia de la clase OdooClientServer.
+            category_name (str): El nombre de la nueva categoría.
+            parent_id (int, optional): El ID de la categoría padre. Defaults to False (categoría raíz).
+
+        Returns:
+            int or False: El ID de la nueva categoría creada en Odoo, o False si hubo un error.
+        """
+        product_category_model = product_model.category
+        category_data = {
+            'name': category_name,
+            'parent_id': parent_id,
+        }
+
+        # Verificar si la categoría ya existe por nombre (en la raíz o bajo el padre especificado)
+        domain = [('name', '=', category_name)]
+        if parent_id:
+            domain.append(('parent_id', '=', parent_id))
+        else:
+            domain.append(('parent_id', '=', False))
+
+        existing_category_ids = self.client.search(product_category_model, domain)
+
+        if not existing_category_ids:
+            try:
+                new_category_id = self.client.create(product_category_model, category_data)
+                print(f"Categoría '{category_name}' creada con ID: {new_category_id}")
+                return new_category_id
+            except Exception as e:
+                print(f"Error al crear la categoría '{category_name}': {e}")
+                return False
+        else:
+            print(f"La categoría '{category_name}' ya existe (ID: {existing_category_ids[0]}).")
+            return existing_category_ids[0]
+
+
     def create_initial_inventory(self, products_table: pd.DataFrame):
         """
         Crea nuevos productos en Odoo y establece su cantidad inicial en el inventario.
