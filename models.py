@@ -11,6 +11,7 @@ class Product:
     """
     model = 'product.product'
     template = 'product.template'
+    category = 'product.category'
     
 product_model = Product()
 
