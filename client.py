@@ -97,33 +97,56 @@ class OdooClientServer:
             self.db, self.uid, self.password, model, 'search_read', [domain], {'fields': fields}
             )
 
-    def create(self, model: str, vals: dict):
+    def create(self, model: str, vals: dict | list[dict]):
         '''
         Create a new record in the specified model.
         :param model: The name of the model to create a record in.
         :param vals: A dictionary of field names and values for the new record.
         :return: The ID of the newly created record.
         '''
-        return self.models.execute_kw(self.db, self.uid, self.password, model, 'create', [vals])
+        if isinstance(vals, dict):
+            vals = [vals]
+        
+        return self.models.execute_kw(
+            self.db, self.uid, self.password, model,
+            'create', [vals]
+        )
 
-    def update(self, model: str, ids: list[int], vals: dict):
+    def update_single_record(self, model: str, record_id: int | list[int], new_val: dict):
         '''
         Update existing records in the specified model.
         :param model: The name of the model to update records in.
-        :param ids: A list of record IDs to update.
+        :param record_id:
+            if int: The ID of the record to update.
+            if list: A list of record IDs to update with the given value.
         :param vals: A dictionary of field names and values to update.
-        :return: True if the update was successful, False otherwise.
+        :return: List like [[id, new_val]].
         '''
-        return self.models.execute_kw(self.db, self.uid, self.password, model, 'write', [ids], vals)
+        if isinstance(record_id, int):
+            record_id = [record_id]
+        
+        return self.models.execute_kw(
+                self.db, self.uid, self.password, model,
+                'write',
+                [record_id, new_val]
+            )
 
-    def delete(self, model: str, ids: list[int]):
+    def delete(self, model: str, ids: int | list[int]) -> None:
         '''
         Delete records from the specified model.
         :param model: The name of the model to delete records from.
         :param ids: A list of record IDs to delete.
         :return: True if the deletion was successful, False otherwise.
         '''
-        return self.models.execute_kw(self.db, self.uid, self.password, model, 'unlink', [ids])
+        if isinstance(ids, int):
+            ids = [ids]
+        
+        return self.models.execute_kw(
+            self.db, self.uid, self.password,
+            model,
+            'unlink',
+            [ids]
+        )
 
     def get_record_names(self, model: str, ids: list[int]):
         '''
