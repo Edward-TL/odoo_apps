@@ -1,5 +1,8 @@
 from client import OdooClientServer
 from models import (
-    Product,
-    Stock
+    PRODUCT,
+    STOCK,
+    CALENDAR
 )
+
+from handlers.objects import *
