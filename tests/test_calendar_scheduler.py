@@ -6,8 +6,8 @@ import pytest
 from dotenv import dotenv_values
 
 from client import OdooClientServer
-from handlers.apps.calendar import Scheduler
-from handlers.objects import Alarm
+from apps.calendar import Scheduler
+from apps.objects.calendar import Alarm
 
 config = dotenv_values('./tests/test.env')
 odoo = OdooClientServer(

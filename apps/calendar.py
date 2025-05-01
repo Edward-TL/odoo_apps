@@ -9,7 +9,7 @@ from pytz import timezone
 
 from client import OdooClientServer
 from models import CALENDAR
-from handlers.objects import (
+from .objects.calendar import (
     Alarm,
     Frequency, Privacy,
     ShowAs
@@ -71,15 +71,15 @@ class Scheduler:
 
         # Convertir las datetimes a UTC, que es la zona horaria que Odoo espera para el almacenamiento.
         # Asumimos que las datetimes proporcionadas ya están en la timezone_str especificada.
-        # local_tz = timezone(timezone_str)
-        # print("local_tz: ", local_tz)
-        # start_naive = start_datetime.replace(tzinfo=None)
-        # print("start_naive: ", start_naive)
-        # end_naive = end_datetime.replace(tzinfo=None)
-        # start_utc = local_tz.localize(start_naive).astimezone(timezone(timezone_str))
-        # print("start_utc: ", start_utc)
-        # end_utc = local_tz.localize(end_naive).astimezone(timezone(timezone_str))
-        # print("end_utc: ", end_utc)
+        local_tz = timezone(None)
+        print("local_tz: ", local_tz)
+        start_naive = start_datetime.replace(tzinfo=None)
+        print("start_naive: ", start_naive)
+        end_naive = end_datetime.replace(tzinfo=None)
+        start_utc = local_tz.localize(start_naive).astimezone(timezone(timezone_str))
+        print("start_utc: ", start_utc)
+        end_utc = local_tz.localize(end_naive).astimezone(timezone(timezone_str))
+        print("end_utc: ", end_utc)
 
         diferencia = abs(end_datetime - start_datetime)
         diferencia_en_horas = diferencia.total_seconds() / 3600

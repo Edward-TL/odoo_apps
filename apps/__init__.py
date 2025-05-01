@@ -5,4 +5,5 @@ from models import (
     CALENDAR
 )
 
-from handlers.objects import *
+from .objects.calendar import *
+from .objects.stock import *
