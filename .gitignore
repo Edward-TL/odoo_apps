@@ -171,3 +171,4 @@ gcloud_template.cfg
 *.env
 test.env
 tables_files/
+.DS_Store
