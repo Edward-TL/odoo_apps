@@ -4,7 +4,8 @@
 from dataclasses import dataclass
 import pandas as pd
 from client import OdooClientServer  # Importa la clase para la conexión a Odoo
-from models import product_model, stock_model  # Importa los modelos de Odoo
+from models import PRODUCT, STOCK  # Importa los modelos de Odoo
+from handlers.objects import DisplayTypes, CreateVariants
 
 
 @dataclass
@@ -17,6 +18,7 @@ class StockManager:
     """
     client: OdooClientServer
 
+
     def _find_internal_location(self):
         """
         Busca la ubicación interna por defecto para el inventario.
@@ -25,7 +27,7 @@ class StockManager:
             int or False: El ID de la ubicación interna o False si no se encuentra.
         """
         domain = [('usage', '=', 'internal')]
-        location_ids = self.client.search(stock_model.location, domain)
+        location_ids = self.client.search(STOCK.LOCATION, domain)
         if location_ids:
             return location_ids[0]
         return False
@@ -43,33 +45,81 @@ class StockManager:
         Returns:
             int or False: El ID de la nueva categoría creada en Odoo, o False si hubo un error.
         """
-        product_category_model = product_model.category
+        
         category_data = {
             'name': category_name,
             'parent_id': parent_id,
         }
 
-        # Verificar si la categoría ya existe por nombre (en la raíz o bajo el padre especificado)
-        domain = [('name', '=', category_name)]
-        if parent_id:
-            domain.append(('parent_id', '=', parent_id))
-        else:
-            domain.append(('parent_id', '=', False))
+        new_category_id = self.client.create(
+            model = PRODUCT.CATEGORY,
+            vals = category_data
+            )
 
-        existing_category_ids = self.client.search(product_category_model, domain)
+        return new_category_id
+        
+    def create_product_attribute(self, name: str,
+        display_type: DisplayTypes = "select",
+        create_variant: CreateVariants = "dynamic"
+        ):
+        """
+        Crea un nuevo atributo de producto en Odoo. Sin valores
+        """
+        
+        att_id = self.client.create(
+            model = 'product.attribute',
+            vals = {
+                    'name': name,
+                    'display_type': display_type,
+                    'create_variant': create_variant,
+                }
+        )
+        
+        return att_id
 
-        if not existing_category_ids:
-            try:
-                new_category_id = self.client.create(product_category_model, category_data)
-                print(f"Categoría '{category_name}' creada con ID: {new_category_id}")
-                return new_category_id
-            except Exception as e:
-                print(f"Error al crear la categoría '{category_name}': {e}")
-                return False
-        else:
-            print(f"La categoría '{category_name}' ya existe (ID: {existing_category_ids[0]}).")
-            return existing_category_ids[0]
+    def append_attribute_value(
+        self, attribute_id: int | str, name: str,
+        default_extra_price: float | None = None,
+        html_color: str | None = None,
+        image: str | None = None
+        ):
+        """
+        Append values to an existing Attribute
+        """
+        # If it's a string, it's because it's not known the attribute_id
+        if isinstance(attribute_id, str):
+            domain_field = "name"
+            domain_model = PRODUCT.ATTRIBUTE
+            domain_value = [(domain_field, '=', attribute_id)]
+            attribute_id = self.client.search(domain_model, domain_value)
 
+            if isinstance(attribute_id, list):
+                attribute_id = attribute_id[0]
+            else:
+                attribute_id = self.client.create(PRODUCT.ATTRIBUTE, {'name':name})
+        
+        attribute_data = {
+                'name': name,
+                'attribute_id': attribute_id
+            }
+        if html_color:
+            attribute_data['html_color'] = html_color
+        
+        if default_extra_price:
+            attribute_data['default_extra_price'] = default_extra_price
+
+        if image:
+            attribute_data['image'] = image
+
+        att_val_id = self.client.create(
+            PRODUCT.ATTRIBUTE_VALUE,
+            attribute_data
+        )
+
+        return att_val_id
+
+    def create_product_template(self):
+        pass
 
     def create_initial_inventory(self, products_table: pd.DataFrame):
         """
@@ -107,7 +157,7 @@ class StockManager:
                 domain.append(('barcode', '=', product_data['barcode']))
 
             existing_product_ids = self.client.search(
-                model = product_model.model,
+                model = PRODUCT.PRODUCT,
                 domain = domain
                 )
 
@@ -120,7 +170,7 @@ class StockManager:
 
                 # Crear el nuevo producto (variante)
                 new_product_id = self.client.create(
-                    model = product_model.model,
+                    model = PRODUCT.PRODUCT,
                     vals = product_data
                 )
 
@@ -140,7 +190,7 @@ class StockManager:
 
                         # Crear el registro de inventario
                         inventory_id = self.client.create(
-                            model = stock_model.quant,
+                            model = STOCK.QUANT,
                             vals = inventory_data
                         )
 
@@ -150,18 +200,3 @@ class StockManager:
                             print("Error al establecer la cantidad inicial para el producto.")
                 else:
                     print(f"Error al crear el producto: {row['name']}")
-
-# Ejemplo de uso (esto iría en un flujo o en un script principal):
-if __name__ == '__main__':
-    # Crear una instancia del cliente de Odoo
-    odoo_client = OdooClientServer(
-        user_info={'db': 'your_db', 'uid': 1, 'password': 'your_password'})
-
-    # Crear una instancia del StockManager
-    stock_manager = StockManager(client=odoo_client)
-
-    # Leer el DataFrame de productos desde un archivo CSV (o cualquier otra fuente)
-    products_df = pd.read_csv('path_to_your_products_file.csv')
-
-    # Crear el inventario inicial
-    stock_manager.create_initial_inventory(products_df)

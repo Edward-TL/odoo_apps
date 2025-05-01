@@ -10,9 +10,31 @@ Author: EdwardTL
 
 from dataclasses import dataclass
 
-from typing import OrderedDict
+from typing import OrderedDict, Literal
 import xmlrpc.client
 
+COMP_DOMAIN = Literal['=', '<', '>', '<=', '>=', '!=']
+
+@dataclass
+class Printer:
+    """
+    Printer class to handle printing messages.
+    """
+    action: Literal['create', 'update', 'delete']
+    model: str
+    object_id: int | list[int] | list[[int, str]] | bool | None = None
+    status: Literal['SUCCESS', 'FAIL', 'PASS'] = 'SUCCESS'
+    error_message: str | None = None
+
+    def print(self):
+        """
+        Print the message based on the action and status.
+        """
+        message = f"{self.status} | Action: {self.action} | Model: {self.model} | [ID]: {self.object_id}"
+        if self.error_message is not None:
+            message += f" | Error: {self.error_message}"
+
+        print(message)
 
 
 @dataclass
@@ -97,22 +119,70 @@ class OdooClientServer:
             self.db, self.uid, self.password, model, 'search_read', [domain], {'fields': fields}
             )
 
-    def create(self, model: str, vals: dict | list[dict]):
+    def create(self, model: str, vals: dict | list[dict],
+        domain_check: str | list[str] = 'name', domain_comp: COMP_DOMAIN = '=', printer = False):
         '''
         Create a new record in the specified model.
         :param model: The name of the model to create a record in.
         :param vals: A dictionary of field names and values for the new record.
         :return: The ID of the newly created record.
         '''
-        if isinstance(vals, dict):
-            vals = [vals]
         
-        return self.models.execute_kw(
-            self.db, self.uid, self.password, model,
-            'create', [vals]
-        )
+        domains = []
+        if isinstance(vals, list):
+            # print(f"Vals: {vals} are List")
+            if isinstance(domain_check, str):
+                for value in vals:
+                    for k, v in value.items():
+                        if k == domain_check:
+                            domains.append((domain_check, domain_comp, v))
+                            break
 
-    def update_single_record(self, model: str, record_id: int | list[int], new_val: dict):
+            if isinstance(domain_check, list):
+                for domain in domain_check:
+                    for value in vals:
+                        for k, v in value.items():
+                            if k == domain:
+                                domains.append((domain_check, domain_comp, v))
+                    
+        if isinstance(vals, dict):
+            # print(f"Vals: {vals} are Dictionary")
+            domains.append((domain_check, domain_comp, vals[domain_check]))
+        
+        creation_printer = Printer(
+            action = 'create',
+            model = model,
+            )
+
+        exists = self.search(model, domains)
+        
+        if not exists:
+            try:
+                object_id = self.models.execute(
+                    self.db, self.uid, self.password, model,
+                    'create', vals
+                )
+
+                if printer:
+                    creation_printer.object_id = object_id
+                    creation_printer.status = 'SUCCESS'
+                    creation_printer.print()
+
+                return object_id 
+            except Exception as e:
+                    creation_printer.error_message = str(e)
+                    creation_printer.status = 'FAIL'
+                    creation_printer.print()
+
+                    return False
+        else:
+            creation_printer.object_id = exists
+            creation_printer.status = 'PASS'
+            creation_printer.print()
+        
+        return exists[0]
+
+    def update_single_record(self, model: str, record_id: int | list[int], new_val: dict, printer = False):
         '''
         Update existing records in the specified model.
         :param model: The name of the model to update records in.
@@ -124,14 +194,33 @@ class OdooClientServer:
         '''
         if isinstance(record_id, int):
             record_id = [record_id]
-        
-        return self.models.execute_kw(
+
+        update_printer = Printer(
+            action = 'update',
+            model = model,
+            )
+        try: 
+            object_vals = self.models.execute_kw(
                 self.db, self.uid, self.password, model,
                 'write',
                 [record_id, new_val]
             )
+            if printer:
+                update_printer.object_id = object_vals
+                update_printer.status = 'SUCCESS'
+                update_printer.print()
 
-    def delete(self, model: str, ids: int | list[int]) -> None:
+            return object_vals
+
+        except Exception as e:
+                update_printer.error_message = str(e)
+                update_printer.status = 'FAIL'
+                update_printer.print()
+
+                return False
+        
+
+    def delete(self, model: str, ids: int | list[int], printer = False) -> None:
         '''
         Delete records from the specified model.
         :param model: The name of the model to delete records from.
@@ -141,6 +230,33 @@ class OdooClientServer:
         if isinstance(ids, int):
             ids = [ids]
         
+            
+        delete_printer = Printer(
+            action = 'update',
+            model = model,
+            )
+        try: 
+            delete_status = self.models.execute_kw(
+            self.db, self.uid, self.password,
+            model,
+            'unlink',
+            [ids]
+        )
+            if printer:
+                delete_printer.object_id = delete_status
+                delete_printer.status = 'SUCCESS'
+                delete_printer.print()
+
+            return delete_status
+
+        except Exception as e:
+                delete_printer.error_message = str(e)
+                delete_printer.status = 'FAIL'
+                delete_printer.print()
+
+                return False
+        
+
         return self.models.execute_kw(
             self.db, self.uid, self.password,
             model,

@@ -1,3 +1,3 @@
 from handlers.apps.stock import StockManager
-from models import product_model
+from models import PRODUCT
 from client import OdooClientServer
