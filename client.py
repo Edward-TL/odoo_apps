@@ -12,8 +12,10 @@ from dataclasses import dataclass
 
 from typing import OrderedDict, Literal
 import xmlrpc.client
+from pprint import  pprint
+InterestFields = {'string', 'help', 'type', 'selection'}
 
-COMP_DOMAIN = Literal['=', '<', '>', '<=', '>=', '!=']
+CompDomain = Literal['=', '<', '>', '<=', '>=', '!=']
 
 @dataclass
 class Printer:
@@ -69,7 +71,9 @@ class OdooClientServer:
         #                   [('is_company', '=', True)] <- domain example
         #               ]  
         #)
-        return self.models.execute_kw(self.db, self.uid, self.password, model, 'search', [domain])
+        return self.models.execute_kw(
+            self.db, self.uid, self.password,
+            model, 'search', [domain])
 
     def read(self, model: str, ids: list[int], fields: list[str]):
         '''
@@ -120,7 +124,8 @@ class OdooClientServer:
             )
 
     def create(self, model: str, vals: dict | list[dict],
-        domain_check: str | list[str] = 'name', domain_comp: COMP_DOMAIN = '=', printer = False):
+        domain_check: str | list[str] = 'name',
+        domain_comp: CompDomain | list[CompDomain] = '=', printer = False):
         '''
         Create a new record in the specified model.
         :param model: The name of the model to create a record in.
@@ -129,33 +134,48 @@ class OdooClientServer:
         '''
         
         domains = []
-        if isinstance(vals, list):
-            # print(f"Vals: {vals} are List")
-            if isinstance(domain_check, str):
-                for value in vals:
-                    for k, v in value.items():
-                        if k == domain_check:
-                            domains.append((domain_check, domain_comp, v))
-                            break
+        if isinstance(domain_check, str):
+            if isinstance(vals, list):
+                # print(f"Vals: {vals} are List")
+                if isinstance(domain_check, str):
+                    for value in vals:
+                        for k, v in value.items():
+                            if k == domain_check:
+                                domains.append((domain_check, domain_comp, v))
+                                break
+            if isinstance(vals, dict):
+                # print(f"Vals: {vals} are Dictionary")
+                domains.append((domain_check, domain_comp, vals[domain_check]))
 
-            if isinstance(domain_check, list):
-                for domain in domain_check:
+        if isinstance(domain_check, list):
+            print('Domain Check is List')
+            if isinstance(vals, list):
+                for domain, comp in zip(domain_check, domain_comp):
                     for value in vals:
                         for k, v in value.items():
                             if k == domain:
-                                domains.append((domain_check, domain_comp, v))
-                    
-        if isinstance(vals, dict):
-            # print(f"Vals: {vals} are Dictionary")
-            domains.append((domain_check, domain_comp, vals[domain_check]))
+                                domains.append((domain, comp, v))
+
+            if isinstance(vals, dict):
+                print('Just one dictionary values')
+                print(domain_check, domain_comp)
+                print(vals)
+                for domain, comp in zip(domain_check, domain_comp):
+                    for k, v in vals.items():
+                        if k == domain:
+                            domains.append((domain, comp, v))
+                            
+                            
         
+        
+        print("DOMAINS: ", domains)
         creation_printer = Printer(
             action = 'create',
             model = model,
             )
 
         exists = self.search(model, domains)
-        
+        print(exists)
         if not exists:
             try:
                 object_id = self.models.execute(
@@ -290,4 +310,48 @@ class OdooClientServer:
             
         return fields_data
 
+    def read_fields(self, model,
+        domain: list[tuple[str, str, str]] = None, fields: list[str] = None) -> list[dict]:
+        """
+        Combine functions read and search for special fields or
+        models that does not have a field called 'name'
+        """
+
+        return self.read(
+            model = model,
+            ids = self.search(
+                model = model,
+                domain = domain
+            ),
+            fields = fields
+        )
+
+    def print_fields(self, model,
+    interest_fields: set | list = InterestFields, get_values=False) -> None | list:
+        """
+        Print fields from a model
+        :param model: Model name
+        :param fields: Fields to get
+        :return: Dictionary of fields
+        """
+        attribute_fields = self.get_models_fields(
+            model,
+            {
+                'attributes': ['string', 'help', 'type']
+                }
+                )
+        clean_fields = {}
+        for field, props in attribute_fields.items():
+            # print(props)
+            # print(field)
+            if field not in clean_fields:
+                clean_fields[field] = {}
+            for k, v in props.items():
+                if k in interest_fields:
+                    clean_fields[field][k] = v
+        pprint(
+            clean_fields
+        )
+        if get_values:
+            return list(clean_fields.keys())
 

@@ -7,7 +7,8 @@ from dotenv import dotenv_values
 
 from client import OdooClientServer
 from apps.calendar import Scheduler
-from apps.objects.calendar import Alarm
+from apps.objects.calendar import Event
+from constants.account import BASIC_ALARM
 
 config = dotenv_values('./tests/test.env')
 odoo = OdooClientServer(
@@ -27,20 +28,19 @@ class TestScheduler:
 
     # Crear un evento único
     def test_schedule_notification(self):
-        alarms = [
-            (
-                0, 0, Alarm().export_to_dict()
-            )
-        ]
+        
 
         event1_id = scheduler.create_calendar_event(
-            name = "Reunión de equipo",
-            start_datetime = datetime(2025, 4, 29, 16, 0, 0),
-            end_datetime = datetime(2025, 4, 29, 17, 0, 0),
-            partner_ids = partners, # IDs de los partners (contactos)
-            alarm_ids = alarms,
-            description = "Discusión sobre el proyecto actual.",
-            location = "Sala de conferencias A"
+            event = Event(
+                name = "prueba de evento",
+                start_datetime = datetime(2025, 5, 13, 16, 0, 0),
+                end_datetime = datetime(2025, 5, 13, 17, 0, 0),
+                partner_ids = partners, # IDs de los partners (contactos)
+                alarm_ids = BASIC_ALARM,
+                description = "Discusión sobre el proyecto actual.",
+                location = "Sala de conferencias A",
+                timezone_str = "UTC",
+            )
         )
         
         print(f"Evento 1 creado con ID: {event1_id}")

@@ -2,7 +2,31 @@
 Store interest Odoo models
 """
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
+from inspect import getmembers
+
+def generate_modules_dict(data_obj) -> dict:
+    """
+    Generate a dictionary of modules from the class attributes.
+    :param data_obj: Data Class to generate the dictionary from.
+    :return: Dictionary of modules.
+    """
+    return {
+        module[0]:module[1] for module in getmembers(
+            data_obj
+            ) if not module[0].startswith('__')}
+
+def string_class(data_obj) -> str:
+    """
+    Generate a string representation of the class.
+    :param data_obj: Data Class to generate the string from.
+    :return: String representation of the class.
+    """
+    str_class = ""
+    for k,v in data_obj._modules.items():
+        str_class += f"{k}: {v} \n"
+
+    return str_class
 
 @dataclass
 class Product:
@@ -37,7 +61,10 @@ class Product:
     UNSPSC_CODE = 'product.unspsc.code'
 
     def __post_init__(self):
-        self._modules = [module.name for module in fields(self)]
+        self._modules = generate_modules_dict(self)
+
+    def __str__(self):
+        return string_class(self)
 
 PRODUCT = Product()
 
@@ -96,7 +123,10 @@ class Stock:
     WARN_INSUFFICIENT_QTY_UNBUILD = 'stock.warn.insufficient.qty.unbuild'
 
     def __post_init__(self):
-        self._modules = [module.name for module in fields(self)]
+        self._modules = generate_modules_dict(self)
+
+    def __str__(self):
+        return string_class(self)
 
 STOCK = Stock()
 
@@ -120,6 +150,76 @@ class Calendar:
     RECURRENCE = 'calendar.recurrence'
 
     def __post_init__(self):
-        self._modules = [module.name for module in fields(self)]
+        self._modules = generate_modules_dict(self)
+
+    def __str__(self):
+        return string_class(self)
 
 CALENDAR = Calendar()
+
+@dataclass
+class Appointment:
+    """
+    Class representing Appointment tables in Odoo.
+    """
+    _name = 'appointment'
+    ANSWER_INPUT = 'appointment.answer.input'
+    ANSWER = 'appointment.answer'
+    BOOKING_LINE = 'appointment.booking.line'
+    INVITE = 'appointment.invite'
+    MANAGE_LEAVES = 'appointment.manage.leaves'
+    QUESTION = 'appointment.question'
+    RESOURCE = 'appointment.resource'
+    SLOT = 'appointment.slot'
+    TYPE = 'appointment.type'
+
+    def __post_init__(self):
+        self._modules = generate_modules_dict(self)
+
+    def __str__(self):
+        return string_class(self)
+        
+APPOINTMENT = Appointment()
+
+@dataclass
+class Resource:
+    """
+    ** CALENDAR_ATTENDANCE = Work Detail.
+    ** CALENDAR_LEAVES = Resource Time Off Detail.
+     - CALENDAR = Resource Working Time: Calendar model for a resource.
+        It has:
+            * attendance_ids: list of `resource.calendar.attendance` that are a working interval
+                in a given weekday.
+            * leave_ids: list of leaves linked to this calendar.
+                A leave can be general or linked to a specific resource, depending on its
+                `resource_id`.
+                
+        All methods in this class use "intervals".
+            An "interval" is a tuple -> (begin_datetime, end_datetime).
+            A list of intervals is therefore a list of tuples:
+            
+                            [(begin_datetime, end_datetime)]
+            
+            holding several intervals of work or leaves. 
+    - MIXIN = Resource Mixin: The base model, which is implicitly inherited by all models.
+    ** RESOURCE = Resources
+
+    ** [Main super-class for regular database-persisted.
+        Odoo models are created by inheriting from this class]
+    """
+
+
+    _name = "resource"
+    CALENDAR_ATTENDANCE = 'resource.calendar.attendance'
+    CALENDAR_LEAVES = 'resource.calendar.leaves'
+    CALENDAR = 'resource.calendar'
+    MIXIN = 'resource.mixin'
+    RESOURCE = 'resource.resource'
+
+    def __post_init__(self):
+        self._modules = generate_modules_dict(self)
+
+    def __str__(self):
+        return string_class(self)
+
+RESOURCE = Resource()
