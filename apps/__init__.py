@@ -1,12 +1,12 @@
+"""
+APPS init file
+"""
 from client import OdooClientServer
-from models import (
-    PRODUCT,
-    STOCK,
-    CALENDAR
-)
+from models import *
 from constants.account import USER_ID
 
-from .objects.calendar import *
-from .objects.stock import *
-from .objects.appointment import *
-from .objects.time_management import *
+from .calendar.scheduler import Scheduler
+from .calendar.objects import Alarm, Event
+from .stock.stock_manager import StockManager
+from .appointment.appt_manager import AppointmentManager
+from .helpers.time_management import *

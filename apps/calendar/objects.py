@@ -5,12 +5,9 @@ from datetime import datetime
 from pytz import timezone
 from constants.account import DOCTOR_RESOURCE_ID
 
-Privacy = Literal['public', 'private', 'confidential']
-ShowAs = Literal['busy', 'free']
-Frequency = Literal['daily', 'weekly', 'monthly', 'yearly']
-AlarmType = Literal['notification', 'email', 'sms']
-Interval = Literal['minutes', 'hours', 'days']
-AppointmentTz = Literal['America/Mexico_City', 'America/Monterrey', 'UTC']
+from apps.type_hints.calendar import AlarmType, Frequency, Interval
+from apps.type_hints.media_relations import Privacy, ShowAs
+from apps.type_hints.time_zone import TimeZone
 
 @dataclass
 class Alarm:
@@ -80,7 +77,7 @@ class Event:
     rrule_type: Frequency = 'daily'
     count: int = 0  # Número de repeticiones (0 para indefinido si recurrencia es True)
     until: datetime = None  # Fecha límite de recurrencia
-    timezone_str: AppointmentTz = 'UTC'  # Zona horaria del self. (ej. 'America/Mexico_City')
+    timezone_str: TimeZone = 'UTC'  # Zona horaria del self. (ej. 'America/Mexico_City')
     odoo_id: int | None = None  # ID del evento en Odoo (opcional, se asigna al crear el evento)
     is_all_day: bool = False  # Indica si el evento es de todo el día (True) o tiene hora específica (False)
 

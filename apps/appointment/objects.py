@@ -1,43 +1,13 @@
 """
 """
 from dataclasses import dataclass
-from typing import Literal
 from datetime import datetime
 
 from constants.account import PARTNER_ID, DOCTOR_RESOURCE_ID, DOCTOR_APPT_TYPE
-from .time_management import standarize_datetime
-from .calendar import Event, Alarm, BASIC_ALARM
 
-ActivityExceptionDecorator = Literal['warning', 'danger']
-ActivityState = Literal['overdue', 'today', 'planned']
-AppointmentCategory = Literal[
-    'recurring', # Regular
-    'punctual', # Punctual
-    'custom', # Specific Slots
-    'anytime' # Shared Calendar'
-]
-AvatarsDisplay = Literal['hide', 'show']
-AssignMethod = Literal[
-    'resource_time', #'Pick User/Resource then Time
-    'time_resource', #'Select Time then User/Resource
-    'time_auto_assign' #'Select Time then auto-assign
-]
-# apps/objects/appointment.py
-# Definiciones de tipos literales si son necesarios para campos específicos
-# (Aunque para appointment.appointment, muchos campos son IDs o strings/datetimes)
-AppointmentTz = Literal[
-    'America/Mexico_City',
-    'America/Monterrey',
-    'UTC'
-    ] # Añade más si es necesario
-
-EventVideocallSource = Literal['discuss', 'google_meet'] #Discuss is Odoo Discuss
-CategoryTimeDisplay = Literal[
-    'recurring_fields', # Available now
-    'punctual_fields', # Withina a date range
-]
-RecurreceRuleType = Literal['daily', 'weekly', 'monthly', 'yearly']
-ShowAs = Literal['busy', 'free']
+from apps.helpers.time_management import standarize_datetime
+from apps.calendar.objects import Event, Alarm, BASIC_ALARM
+from apps.type_hints.time_zone import TimeZone
 
 @dataclass
 class Appointment:
@@ -71,7 +41,7 @@ class Appointment:
     description: str = "Consulta de prueba"
     capacity_reserved: int = 1
     capacity_used: int = 1
-    timezone_str: AppointmentTz | None = 'America/Mexico_City'
+    timezone_str: TimeZone | None = 'America/Mexico_City'
     alarm_id: Alarm = BASIC_ALARM
     odoo_id: int | None = None
     calendar_event_id: int | None = None

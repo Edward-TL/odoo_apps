@@ -1,14 +1,18 @@
-# apps/appointment.py
-
+"""
+apps/appointment/appt_manager.py
+Appointment Manager file
+"""
 from copy import copy
 from dataclasses import dataclass
 from pprint import pprint
 from typing import List, Optional
 
+from apps.calendar.scheduler import Scheduler
+
 from client import OdooClientServer # Asegúrate de importar Printer si la usas directamente
 from models import APPOINTMENT # Importa la clase APPOINTMENT de models.py
-from .objects.appointment import Appointment # Importa la clase Appointment que acabas de crear
-from .calendar import Scheduler
+
+from .objects import Appointment # Importa la clase Appointment que acabas de crear
 
 @dataclass
 class AppointmentManager:

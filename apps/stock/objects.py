@@ -3,45 +3,14 @@
 from dataclasses import dataclass, fields
 from typing import Literal
 
-DisplayTypes = Literal["radio", "pills", "select", "color", "multi"]
-# === FROM ODOO ===
-# 'display_type': {'help': 'The display type used in the Product Configurator.',
-#                   'selection': [['radio', 'Radio'],
-#                                 ['pills', 'Pills'],
-#                                 ['select', 'Select'],
-#                                 ['color', 'Color'],
-#                                 ['multi', 'Multi-checkbox']],
-#                   'string': 'Display Type',
-
-
-
-CreateVariants = Literal["always", "dynamic", "no_variant"]
-
-# 'create_variant': {
-#       'help': '- Instantly: All possible variants are created as '
-            #     'soon as the attribute and its values are added to '
-            #     'a product.\n'
-            # '- Dynamically: Each variant is created '
-            #     'only when its corresponding attributes and values '
-            #     'are added to a sales order.\n'
-            # '- Never: Variants are never created for '
-            #     'the attribute.\n'
-            # 'Note: this cannot be changed once the '
-            #     'attribute is used on a product.',
-# 'selection': [['always', 'Instantly'],
-#                 ['dynamic', 'Dynamically'],
-#                 ['no_variant', 'Never']],
-# 'string': 'Variant Creation',
-# 'type': 'selection'},
-
 @dataclass
 class ProductTemplate:
     name: str
     categ_id: str
     list_price: float
     qty_available: int
-    pos_categ_ids: str | list
-    public_categ_ids: str | list
+    pos_categ_ids: list[int]
+    public_categ_ids: list[int]
     barcode: str
 # 'public_categ_ids':
 # {'help': 'The product will be available in each mentioned eCommerce category.

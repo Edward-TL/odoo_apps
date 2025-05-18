@@ -6,7 +6,7 @@ from pprint import pprint
 
 from client import OdooClientServer
 from models import CALENDAR
-from .objects.calendar import Event
+from .objects import Event
 
 
 @dataclass
