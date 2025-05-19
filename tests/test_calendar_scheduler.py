@@ -7,8 +7,7 @@ from dotenv import dotenv_values
 
 from client import OdooClientServer
 from apps.calendar import Scheduler
-from apps.objects.calendar import Event
-from constants.account import BASIC_ALARM
+from apps.calendar.objects import Event, BASIC_ALARM
 
 config = dotenv_values('./tests/test.env')
 odoo = OdooClientServer(

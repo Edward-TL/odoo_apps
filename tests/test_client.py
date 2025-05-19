@@ -6,7 +6,7 @@ from dotenv import dotenv_values
 
 from models import PRODUCT
 from client import OdooClientServer
-from apps.stock import StockManager
+from apps.stock.stock_manager import StockManager
 
 config = dotenv_values('./tests/test.env')
 odoo = OdooClientServer(
@@ -141,10 +141,10 @@ class TestOdooClient:
             ids = delete_ids
         )
 
-        delete_confirmation_response = odoo.search(
-            model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', "TEST"])]
-            )
+        # delete_confirmation_response = odoo.search(
+        #     model = PRODUCT.CATEGORY,
+        #     domain = [(['name', '=', "TEST"])]
+        #     )
 
         # print(f"Delete Confirmation response: {delete_confirmation_response}")
 
