@@ -172,4 +172,8 @@ gcloud_template.cfg
 test.env
 tables_files/
 .DS_Store
-./utils/helpers.py
+helpers.py
+utils/helpers.py
+./utils/helpers
+
+utils/
