@@ -1,3 +1,6 @@
+"""
+Helpers init file
+"""
 from .time_management import standarize_datetime
 
-from .type_hints.stock import *
+from apps.type_hints.stock import *

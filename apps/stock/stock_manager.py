@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pandas as pd
 from client import OdooClientServer  # Importa la clase para la conexión a Odoo
 from models import PRODUCT, STOCK  # Importa los modelos de Odoo
-from .objects import DisplayTypes, CreateVariants
+from apps.type_hints.stock import DisplayTypes, CreateVariants
 
 
 @dataclass

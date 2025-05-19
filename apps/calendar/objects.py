@@ -1,9 +1,7 @@
 
-from dataclasses import dataclass, fields
-from typing import Literal
+from dataclasses import dataclass, fields, field
 from datetime import datetime
 from pytz import timezone
-from constants.account import DOCTOR_RESOURCE_ID
 
 from apps.type_hints.calendar import AlarmType, Frequency, Interval
 from apps.type_hints.media_relations import Privacy, ShowAs
@@ -65,7 +63,7 @@ class Event:
     name: str
     start_datetime: datetime
     end_datetime: datetime
-    partner_ids: list[str] | list[int] | None = [3]
+    partner_ids: list[str] | list[int] | None = field(default_factory=[3])
     alarm_ids: list[Alarm] | list[str] | list[int] | None = BASIC_ALARM
     description: str = "Espacio agendado"
     location: str = ""
