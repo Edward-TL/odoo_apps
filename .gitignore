@@ -175,5 +175,4 @@ tables_files/
 helpers.py
 utils/helpers.py
 ./utils/helpers
-
-utils/
+constants/
