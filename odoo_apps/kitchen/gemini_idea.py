@@ -1,6 +1,6 @@
 
 import logging
-from client import OdooClientServer
+from odoo_apps.client import OdooClientServer
 
 def procesar_orden_cocina(odoo_client: OdooClientServer, payload: dict) -> dict:
     """

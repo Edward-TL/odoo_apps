@@ -4,9 +4,9 @@ Client functions
 import pytest
 from dotenv import dotenv_values
 
-from models import PRODUCT
-from client import OdooClientServer
-from apps.stock.stock_manager import StockManager
+from odoo_apps.models import PRODUCT
+from odoo_apps.client import OdooClientServer
+from odoo_apps.stock.stock_manager import StockManager
 
 config = dotenv_values('./tests/test.env')
 odoo = OdooClientServer(

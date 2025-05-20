@@ -3,4 +3,4 @@ Helpers init file
 """
 from .time_management import standarize_datetime
 
-from apps.type_hints.stock import *
+from odoo_apps.type_hints.stock import *

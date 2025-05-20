@@ -3,9 +3,9 @@ from dataclasses import dataclass, fields, field
 from datetime import datetime
 from pytz import timezone
 
-from apps.type_hints.calendar import AlarmType, Frequency, Interval
-from apps.type_hints.media_relations import Privacy, ShowAs
-from apps.type_hints.time_zone import TimeZone
+from odoo_apps.type_hints.calendar import AlarmType, Frequency, Interval
+from odoo_apps.type_hints.media_relations import Privacy, ShowAs
+from odoo_apps.type_hints.time_zone import TimeZone
 
 @dataclass
 class Alarm:

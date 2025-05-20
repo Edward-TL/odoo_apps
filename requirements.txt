@@ -1,10 +1,6 @@
-firebase-admin
-google-cloud-aiplatform
-google-genai
-python-dotenv
-pydantic
-pytest
-requests
+flask
 pandas
-sqlalchemy
+pytest
+pytz
+requests
 openpyxl

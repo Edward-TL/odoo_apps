@@ -5,9 +5,9 @@ from datetime import datetime
 
 from constants.account import PARTNER_ID, DOCTOR_RESOURCE_ID, DOCTOR_APPT_TYPE
 
-from apps.helpers.time_management import standarize_datetime
-from apps.calendar.objects import Event, Alarm, BASIC_ALARM
-from apps.type_hints.time_zone import TimeZone
+from odoo_apps.helpers.time_management import standarize_datetime
+from odoo_apps.calendar.objects import Event, Alarm, BASIC_ALARM
+from odoo_apps.type_hints.time_zone import TimeZone
 
 @dataclass
 class Appointment:

@@ -7,11 +7,11 @@ from dataclasses import dataclass
 from pprint import pprint
 from typing import List, Optional
 
-from apps.calendar.scheduler import Scheduler
+from odoo_apps.calendar.scheduler import Scheduler
 
-from client import OdooClientServer # Asegúrate de importar Printer si la usas directamente
-from models import APPOINTMENT # Importa la clase APPOINTMENT de models.py
-
+from odoo_apps.client import OdooClientServer # Asegúrate de importar Printer si la usas directamente
+from odoo_apps.models import APPOINTMENT # Importa la clase APPOINTMENT de models.py
+from odoo_apps.response import Request, Response, standarize_response
 from .objects import Appointment # Importa la clase Appointment que acabas de crear
 
 @dataclass
@@ -37,11 +37,16 @@ class AppointmentManager:
 
 
         if request['appointment_type_id'] is None and request['name_type'] is not None:
-            return {
-                'status': 400,
-                'message': "Neither appointment type nor name type is set.",
-                'data': None
-            }
+
+            return standarize_response(
+                request = request,
+                response = Response(
+                    action = 'create',
+                    model = APPOINTMENT.TYPE,
+                    http_status = 400,
+                    msg = "Neither appointment type nor name type is set."
+                )
+            )
         if request['appointment_type_id'] is None:
             existing_ids = self.client.search(
                 APPOINTMENT.TYPE,
@@ -67,7 +72,7 @@ class AppointmentManager:
 
         return appointment
 
-    def book_appointment(self, appointment: Appointment) -> Optional[int | List[int]]:
+    def book_appointment(self, appointment: Appointment, printer=False) -> dict:
         """
         Creates a new appointment in Odoo using RPC.
 
@@ -90,33 +95,42 @@ class AppointmentManager:
             event_data['current_attendee'] = appointment.partner_id
             
             appointment.event.data = event_data
-            print(appointment.event.data)
+            if printer:
+                print('appointment.event.data')
+                print(appointment.event.data)
 
-            appointment.calendar_event_id = self.scheduler.create_calendar_event(
-                event = appointment.event
+            calendar_response = self.scheduler.create_calendar_event(
+                event = appointment.event,
+                printer=printer
             )
-        pprint(appointment.extract_booking_data())
+            if printer:
+                print("CALENDAR RESPONSE ")
+                calendar_response.print()
+
+            appointment.calendar_event_id = calendar_response.object_id
+    
+            if printer:
+                pprint(appointment.extract_booking_data())
 
         try:
             # Use the client.create method which includes built-in printing
             # We don't need domain_check here because we did the check manually above.
             # Pass printer=True to enable the printing from the client method.
-            appointment_id = self.client.create(
+            appt_response = self.client.create(
                 model = APPOINTMENT.BOOKING_LINE,
                 vals = appointment.extract_booking_data(),
                 domain_check = ['event_start', 'event_stop'],
-                domain_comp = ['=', '=']
+                domain_comp = ['=', '='],
+                printer=printer
                 # domain_check and domain_comp are not needed due to manual check
             )
 
             # The client.create method returns the ID(s) on SUCCESS/PASS or False on FAIL.
             # We just need to return its result.
-            if appointment_id:
-                 # If creation was successful (and returned an ID/list), update the object
-                 if isinstance(appointment_id, list) and len(appointment_id) == 1:
-                     return appointment_id[0], 200
-                 if isinstance(appointment_id, int):
-                     return appointment_id, 200
+            return standarize_response(
+                request = appointment.extract_booking_data(),
+                response = appt_response
+            )
 
         except Exception as e:
             # The client.create method should handle printing the error,

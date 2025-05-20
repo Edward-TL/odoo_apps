@@ -1,6 +1,6 @@
 import json
 import logging
-from client import OdooClientServer
+from odoo_apps.client import OdooClientServer
 from .methods.kitchen import procesar_orden_cocina, actualizar_estado_orden
 
 def odoo_api_handler(request):

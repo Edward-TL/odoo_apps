@@ -1,1 +1,1 @@
-from client import OdooClientServer
+from odoo_apps.client import OdooClientServer

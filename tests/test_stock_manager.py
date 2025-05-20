@@ -4,9 +4,9 @@ STOCK MANAGER functions
 import pytest
 from dotenv import dotenv_values
 
-from models import PRODUCT
-from client import OdooClientServer
-from apps.stock.stock_manager import StockManager
+from odoo_pyrpc.models import PRODUCT
+from odoo_pyrpc.client import OdooClientServer
+from odoo_pyrpc.apps.stock.stock_manager import StockManager
 
 config = dotenv_values('./tests/test.env')
 odoo = OdooClientServer(

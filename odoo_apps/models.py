@@ -3,18 +3,8 @@ Store interest Odoo models
 """
 
 from dataclasses import dataclass
-from inspect import getmembers
+from .utils.cleaning import generate_dict
 
-def generate_modules_dict(data_obj) -> dict:
-    """
-    Generate a dictionary of modules from the class attributes.
-    :param data_obj: Data Class to generate the dictionary from.
-    :return: Dictionary of modules.
-    """
-    return {
-        module[0]:module[1] for module in getmembers(
-            data_obj
-            ) if not module[0].startswith('__')}
 
 def string_class(data_obj) -> str:
     """
@@ -61,7 +51,7 @@ class Product:
     UNSPSC_CODE = 'product.unspsc.code'
 
     def __post_init__(self):
-        self._modules = generate_modules_dict(self)
+        self._modules = generate_dict(self)
 
     def __str__(self):
         return string_class(self)
@@ -123,7 +113,7 @@ class Stock:
     WARN_INSUFFICIENT_QTY_UNBUILD = 'stock.warn.insufficient.qty.unbuild'
 
     def __post_init__(self):
-        self._modules = generate_modules_dict(self)
+        self._modules = generate_dict(self)
 
     def __str__(self):
         return string_class(self)
@@ -150,7 +140,7 @@ class Calendar:
     RECURRENCE = 'calendar.recurrence'
 
     def __post_init__(self):
-        self._modules = generate_modules_dict(self)
+        self._modules = generate_dict(self)
 
     def __str__(self):
         return string_class(self)
@@ -174,7 +164,7 @@ class Appointment:
     TYPE = 'appointment.type'
 
     def __post_init__(self):
-        self._modules = generate_modules_dict(self)
+        self._modules = generate_dict(self)
 
     def __str__(self):
         return string_class(self)
@@ -217,7 +207,7 @@ class Resource:
     RESOURCE = 'resource.resource'
 
     def __post_init__(self):
-        self._modules = generate_modules_dict(self)
+        self._modules = generate_dict(self)
 
     def __str__(self):
         return string_class(self)

@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 import pytest
 from dotenv import dotenv_values
 
-from client import OdooClientServer
-from apps.appointment.appt_manager import AppointmentManager
+from odoo_apps.client import OdooClientServer
+from odoo_apps.appointment.appt_manager import AppointmentManager
 from constants.account import DOCTOR_APPT_TYPE, DOCTOR_RESOURCE_ID
 
 config = dotenv_values('./tests/test.env')
@@ -52,6 +52,16 @@ class TestAppointmentManager:
             }
         )
 
-        appointment_id, status = test_appt_manager.book_appointment(test_appt)
+        appt_response = test_appt_manager.book_appointment(test_appt)
+        check = [
+            isinstance(appt_response, dict),
+            'request' in appt_response,
+            appt_response['request']['event_start'] == test_appt['event_start'],
+            appt_response['request']['event_stop'] == test_appt['event_stop'],   
+            appt_response['request']['name'] == test_appt['name'],
 
-        assert appointment_id > 0 and status == 200
+            appt_response['response']['http_status'] in [201, 200],
+            appt_response['response']['object_id'] > 0
+        ]
+
+        assert all(check)
