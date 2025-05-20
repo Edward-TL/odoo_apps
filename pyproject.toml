@@ -1,25 +1,21 @@
 [project]
-name = "odoo-rpc"
-version = "0.2.0"
-description = "Tools that simplifies interaction with Odoo RPC"
+name = "odoo_apps"
+version = "0.1.0"
+description = "A traduction of Odoos's RPC into classes."
 authors = [
-    {name = "Edward",email = "edward_tl@hotmail.com"}
+    {name = "Edward Toledo Lopez",email = "edward_tl@hotmail.com"}
 ]
-license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "firebase-admin (>=6.7.0,<7.0.0)",
-    "google-cloud-aiplatform (>=1.90.0,<2.0.0)",
-    "google-genai (>=1.11.0,<2.0.0)",
-    "python-dotenv (>=1.1.0,<2.0.0)",
-    "pydantic (>=2.11.3,<3.0.0)",
-    "pytest (>=8.3.5,<9.0.0)",
     "requests (>=2.32.3,<3.0.0)",
     "pandas (>=2.2.3,<3.0.0)",
-    "sqlalchemy (>=2.0.40,<3.0.0)",
     "openpyxl (>=3.1.5,<4.0.0)",
-    "gspread (>=6.2.0,<7.0.0)"
+    "python-dotenv (>=1.1.0,<2.0.0)",
+    "pydantic (>=2.11.4,<3.0.0)",
+    "pytest (>=8.3.5,<9.0.0)",
+    "pytz (>=2025.2,<2026.0)",
+    "flask (>=3.1.1,<4.0.0)"
 ]
 
 
