@@ -61,9 +61,9 @@ class Response:
         message = ""
         message += f"{self.status} | "
         if self.status != 'FAIL':
-            message += f" | Message: {meaning[self.http_status]}"
+            message += f"Message: {meaning[self.http_status]}"
         else:
-            message += f" | Error: {error_message}"
+            message += f"Error: {error_message}"
         message += f"Action: {self.action} | "
         message += f"Model: {self.model} | "
         message += f"[ID]: {self.object_id}"
