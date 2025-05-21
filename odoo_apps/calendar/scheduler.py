@@ -6,6 +6,7 @@ from pprint import pprint
 
 from odoo_apps.client import OdooClientServer
 from odoo_apps.models import CALENDAR
+from odoo_apps.request import CreateRequest
 from .objects import Event
 
 
@@ -36,12 +37,14 @@ class Scheduler:
             # esto se esta considerando para una sola persona, no es necesario por ahora.
             #  
             event_response = self.client.create(
-                model = CALENDAR.EVENT,
-                vals = event.data,
-                domain_check = ['start', 'stop'],
-                domain_comp = ['>=', '<='],
+                CreateRequest(
+                    model = CALENDAR.EVENT,
+                    vals = event.data,
+                    domain_check = ['start', 'stop'],
+                    domain_comp = ['>=', '<=']
+                ),
                 printer=printer
-                )
+            )
 
             event.odoo_id = event_response.object_id
 

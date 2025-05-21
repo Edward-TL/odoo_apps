@@ -18,8 +18,15 @@ from pprint import pprint
 
 import pandas as pd
 
+from .request import (
+    SearchRequest,
+    ReadRequest,
+    SearchReadRequest,
+    CreateRequest,
+    UpdateRequest,
+    DeleteRequest
+    )
 from .response import Response
-from .utils.cleaning import check_domains, CompDomain
 
 InterestFields = ['string', 'help', 'type', 'selection']
 
@@ -52,7 +59,7 @@ class OdooClientServer:
         self.uid = common.authenticate(self.db, self.username, self.password, {})
         self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
 
-    def search(self, model: str, domain: list[tuple[str, str, str]]):
+    def search(self, request: SearchRequest):
         '''
         Search for records in the specified model that match the given domain.
         :param model: The name of the model to search in.
@@ -68,9 +75,12 @@ class OdooClientServer:
         #)
         return self.models.execute_kw(
             self.db, self.uid, self.password,
-            model, 'search', [domain])
+            request.model, request.action,
+            [request.domains]
+        )
 
-    def read(self, model: str, ids: list[int], fields: list[str]):
+    def read(self, request: ReadRequest):
+    # model: str, ids: list[int], fields: list[str]):
         '''
         Read records from the specified model.
         :param model: The name of the model to read from.
@@ -86,15 +96,17 @@ class OdooClientServer:
         # )
 
         return self.models.execute_kw(
-            self.db, self.uid, self.password, model, 'read', [ids], {'fields': fields}
+            self.db, self.uid, self.password,
+            request.model, request.action,
+            [request.ids], {'fields': request.fields}
             )
         # Esto es de Gemini
         # data = models.execute_kw(
         #   db, uid, password, 'res.partner', 'read', [ids, ['name', 'email']]
         #)
 
-    def search_read(self, model: str,
-        domain: list[tuple[str, str, str]] = None, fields: list[str] = None):
+    def search_read(self, request: SearchReadRequest):
+        # domain: list[tuple[str, str, str]] = None, fields: list[str] = None):
         '''
         Search and read records from the specified model.
         :param model: The name of the model to search and read from.
@@ -115,13 +127,13 @@ class OdooClientServer:
             fields = ['name']
 
         return self.models.execute_kw(
-            self.db, self.uid, self.password, model, 'search_read', [domain], {'fields': fields}
+            self.db, self.uid, self.password,
+            request.model, request.action,
+            [request.domain], request.query
             )
 
     def create(
-        self, model: str, vals: dict | list[dict],
-        domain_check: str | list[str] = 'name',
-        domain_comp: CompDomain | list[CompDomain] = '=', printer = False
+        self, request: CreateRequest, printer = False
         ) -> Response:
         '''
         Create a new record in the specified model.
@@ -130,63 +142,49 @@ class OdooClientServer:
         :return: The ID of the newly created record.
         '''
 
-        domains = check_domains(
-            domain_check = domain_check,
-            domain_comp = domain_comp,
-            vals = vals
-        )
-
-        if printer:
-            print("DOMAINS: ", domains)
         response = Response(
             action = 'create',
-            model = model
+            model = request.model
             )
 
-        exists = self.search(model, domains)
+        exists = self.search(request.search_request)
         if printer:
-            print(exists)
-
+            print("DOMAINS: ", request.domains)
+            print("Exist: ", exists)
         if not exists:
             try:
                 object_id = self.models.execute(
-                    self.db, self.uid, self.password, model,
-                    'create', vals
+                    self.db, self.uid, self.password,
+                    request.model, request.action, request.vals
                 )
-                
-                response.object_id = object_id
-                response.status = 'SUCCESS'
-                response.update_message()
-                if printer:
-                    print(object_id)
-                    print('success creating')
-                    response.print()
-
+                response.complete_response(
+                    obj_id = object_id,
+                    status = 201,
+                    printer = printer
+                )
                 return response
 
             except Exception as e:
-                response.status = 'FAIL'
-                response.update_message(error_message=str(e))
-                if printer:
-                    response.print()
-
+                response.complete_response(
+                    obj_id = False,
+                    status = 406,
+                    msg = str(e),
+                    printer = printer
+                )
                 return response
-
+        # IF EXISTS
+        if isinstance(exists,list):
+            object_id = exists[0]
         else:
-            if isinstance(exists,list):
-                response.object_id = exists[0]
-            else:
-                response.object_id = exists
-
-            response.status = 'PASS'
-            response.update_message()
-            if printer:
-                print('passing')
-                response.print()
-
+            object_id = exists
+        response.complete_response(
+            obj_id = object_id,
+            status = 200,
+            printer = printer
+        )
         return response
 
-    def update_single_record(self, model: str, record_id: int | list[int], new_val: dict, printer = False):
+    def update_single_record(self, request: UpdateRequest , printer = False):
         '''
         Update existing records in the specified model.
         :param model: The name of the model to update records in.
@@ -199,74 +197,66 @@ class OdooClientServer:
         if isinstance(record_id, int):
             record_id = [record_id]
 
-        update_printer = Response(
+        response = Response(
             action = 'update',
-            model = model,
+            model = request.model,
             )
         try:
             object_vals = self.models.execute_kw(
-                self.db, self.uid, self.password, model,
-                'write',
-                [record_id, new_val]
+                self.db, self.uid, self.password,
+                request.model, request.action,
+                [request.record_id, request.new_val]
             )
-            if printer:
-                update_printer.object_id = object_vals
-                update_printer.status = 'SUCCESS'
-                update_printer.print()
-
-            return object_vals
+            response.complete_response(
+                    obj_id = object_vals,
+                    status = 201,
+                    printer = printer
+                )
+            return response
 
         except Exception as e:
-            update_printer.error_message = str(e)
-            update_printer.status = 'FAIL'
-            update_printer.print()
-
-            return False
+            response.complete_response(
+                obj_id = False,
+                status = 406,
+                msg = str(e),
+                printer = printer
+            )
+            return response
         
 
-    def delete(self, model: str, ids: int | list[int], printer = False) -> None:
+    def delete(self, request: DeleteRequest, printer = False) -> None:
         '''
         Delete records from the specified model.
         :param model: The name of the model to delete records from.
         :param ids: A list of record IDs to delete.
         :return: True if the deletion was successful, False otherwise.
         '''
-        if isinstance(ids, int):
-            ids = [ids]
-
-
-        delete_printer = Response(
+        response = Response(
             action = 'update',
-            model = model,
+            model = request.model,
             )
-        try: 
+        try:
             delete_status = self.models.execute_kw(
-            self.db, self.uid, self.password,
-            model,
-            'unlink',
-            [ids]
-        )
-            if printer:
-                delete_printer.object_id = delete_status
-                delete_printer.status = 'SUCCESS'
-                delete_printer.print()
-
-            return delete_status
+                self.db, self.uid, self.password,
+                request.model, request.action, [request.ids]
+            )
+            delete_msg = f'Success deleting obj with ID(s): {request.ids}'
+            response.complete_response(
+                obj_id = delete_status,
+                status = 200,
+                msg = delete_msg,
+                printer = printer
+            )
+            return response
 
         except Exception as e:
-            delete_printer.error_message = str(e)
-            delete_printer.status = 'FAIL'
-            delete_printer.print()
-
-            return False
-        
-
-        return self.models.execute_kw(
-            self.db, self.uid, self.password,
-            model,
-            'unlink',
-            [ids]
-        )
+            response.complete_response(
+                obj_id = False,
+                status = 406,
+                msg = str(e),
+                printer = printer
+            )
+            return response
 
     def get_record_names(self, model: str, ids: list[int]):
         '''
@@ -275,7 +265,10 @@ class OdooClientServer:
         :param ids: A list of record IDs to get names for.
         :return: A list of tuples containing record IDs and their corresponding names.
         '''
-        return self.models.execute_kw(self.db, self.uid, self.password, model, 'name_get', [ids])
+        return self.models.execute_kw(
+            self.db, self.uid, self.password,
+            model, 'name_get', [ids]
+            )
 
     def get_models_fields(self, model: str, attributes = False) -> tuple | dict:
         '''
@@ -287,7 +280,10 @@ class OdooClientServer:
         #   db, uid, password, 'res.partner', 'fields_get', [], 
         # {'attributes': ['string', 'type']}
         #)
-        fields_data = self.models.execute_kw(self.db, self.uid, self.password, model, 'fields_get', [])
+        fields_data = self.models.execute_kw(
+            self.db, self.uid, self.password,
+            model, 'fields_get', []
+            )
         if not attributes:
             fields = [field for field in fields_data.keys()]
             return tuple(fields)
@@ -302,12 +298,16 @@ class OdooClientServer:
         """
 
         return self.read(
-            model = model,
-            ids = self.search(
+            ReadRequest(
                 model = model,
-                domain = domain
-            ),
-            fields = fields
+                ids = self.search(
+                    SearchRequest(
+                        model = model,
+                        domains = domain
+                    )
+                ),
+                fields = fields
+            )
         )
 
     def print_fields(self, model,

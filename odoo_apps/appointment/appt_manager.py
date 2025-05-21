@@ -11,7 +11,8 @@ from odoo_apps.calendar.scheduler import Scheduler
 
 from odoo_apps.client import OdooClientServer # Asegúrate de importar Printer si la usas directamente
 from odoo_apps.models import APPOINTMENT # Importa la clase APPOINTMENT de models.py
-from odoo_apps.response import Request, Response, standarize_response
+from odoo_apps.response import Response, standarize_response
+from odoo_apps.request import CreateRequest, SearchRequest
 from .objects import Appointment # Importa la clase Appointment que acabas de crear
 
 @dataclass
@@ -49,11 +50,13 @@ class AppointmentManager:
             )
         if request['appointment_type_id'] is None:
             existing_ids = self.client.search(
-                APPOINTMENT.TYPE,
-                domain = [
-                    ('active', '=', True),
-                    ('name', '=', request['name_type'])
-                ]
+                SearchRequest(
+                    model = APPOINTMENT.TYPE,
+                    domain = [
+                        ('active', '=', True),
+                        ('name', '=', request['name_type'])
+                    ]
+                )
             )
             if len(existing_ids) > 1:
                 request['appointment_type_id'] = existing_ids
@@ -117,10 +120,12 @@ class AppointmentManager:
             # We don't need domain_check here because we did the check manually above.
             # Pass printer=True to enable the printing from the client method.
             appt_response = self.client.create(
-                model = APPOINTMENT.BOOKING_LINE,
-                vals = appointment.extract_booking_data(),
-                domain_check = ['event_start', 'event_stop'],
-                domain_comp = ['=', '='],
+                CreateRequest(
+                    model = APPOINTMENT.BOOKING_LINE,
+                    vals = appointment.extract_booking_data(),
+                    domain_check = ['event_start', 'event_stop'],
+                    domain_comp = ['=', '=']
+                ),
                 printer=printer
                 # domain_check and domain_comp are not needed due to manual check
             )
