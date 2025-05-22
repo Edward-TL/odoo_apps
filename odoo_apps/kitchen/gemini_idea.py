@@ -1,11 +1,11 @@
 
 import logging
-from odoo_apps.client import OdooClientServer
+from odoo_apps.client import OdooClient
 
-def procesar_orden_cocina(odoo_client: OdooClientServer, payload: dict) -> dict:
+def procesar_orden_cocina(odoo_client: OdooClient, payload: dict) -> dict:
     """
     Procesa una orden de cocina, creando un pedido de venta y generando un link de pago.
-    :param odoo_client: Instancia de la clase OdooClientServer.
+    :param odoo_client: Instancia de la clase OdooClient.
     :param payload: Diccionario con los datos de la orden de cocina.
     :return: Un diccionario con el resultado del procesamiento de la orden.
     """
@@ -124,10 +124,10 @@ def procesar_orden_cocina(odoo_client: OdooClientServer, payload: dict) -> dict:
         logging.error(response_data['message'])
         return response_data
     
-def actualizar_estado_orden(odoo_client: OdooClientServer, payload: dict) -> dict:
+def actualizar_estado_orden(odoo_client: OdooClient, payload: dict) -> dict:
     """
     Actualiza el estado de una orden de venta en Odoo.
-    :param odoo_client: Instancia de la clase OdooClientServer.
+    :param odoo_client: Instancia de la clase OdooClient.
     :param payload: Diccionario con los datos para actualizar el estado de la orden.
     :return: Un diccionario con el resultado de la actualización del estado.
     """

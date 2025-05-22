@@ -12,23 +12,16 @@ import io
 import re
 from pathlib import Path
 from dataclasses import dataclass
-from typing import OrderedDict
+from typing import OrderedDict, Optional, Union
 import xmlrpc.client
 from pprint import pprint
 
 import pandas as pd
 
-from .request import (
-    SearchRequest,
-    ReadRequest,
-    SearchReadRequest,
-    CreateRequest,
-    UpdateRequest,
-    DeleteRequest
-    )
+from .utils.cleaning import check_domains, CompDomain
 from .response import Response
 
-InterestFields = ['string', 'help', 'type', 'selection']
+InterestFields = tuple(['string', 'help', 'type', 'selection'])
 
 PROJECT_PATH = str(
     Path(__file__).resolve().parent.parent
@@ -42,7 +35,7 @@ DEFAULT_XLSX_FILE = f'{PROJECT_PATH}/{TABLES_DIR}/xodoo_tables.xlsx'
 
 
 @dataclass
-class OdooClientServer:
+class OdooClient:
     """
     Odoo client server class to interact with Odoo XML-RPC API.
     """
@@ -59,7 +52,8 @@ class OdooClientServer:
         self.uid = common.authenticate(self.db, self.username, self.password, {})
         self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
 
-    def search(self, request: SearchRequest):
+    def search(self, model: str, domains: list[tuple[str,str,str]]):
+        #request: SearchRequest):
         '''
         Search for records in the specified model that match the given domain.
         :param model: The name of the model to search in.
@@ -67,19 +61,19 @@ class OdooClientServer:
                        Each tuple should be in the format (field_name, operator, value).
         :return: A list of record IDs that match the search criteria.
         '''
-        # ids = models.execute_kw(
-        #               db, uid, password, 'res.partner', 'search',
-        #               [
-        #                   [('is_company', '=', True)] <- domain example
-        #               ]  
-        #)
         return self.models.execute_kw(
             self.db, self.uid, self.password,
-            request.model, request.action,
-            [request.domains]
+            model, "search",
+            [domains]
         )
+        # return self.models.execute_kw(
+        #     self.db, self.uid, self.password,
+        #     request.model, request.action,
+        #     [request.domains]
+        # )
 
-    def read(self, request: ReadRequest):
+    def read(self, model: str, ids: list[int], fields: list[str] = ['name']):
+             #: ReadRequest):
     # model: str, ids: list[int], fields: list[str]):
         '''
         Read records from the specified model.
@@ -97,22 +91,29 @@ class OdooClientServer:
 
         return self.models.execute_kw(
             self.db, self.uid, self.password,
-            request.model, request.action,
-            [request.ids], {'fields': request.fields}
+            model, 'read',
+            [ids], {'fields': fields}
             )
         # Esto es de Gemini
         # data = models.execute_kw(
         #   db, uid, password, 'res.partner', 'read', [ids, ['name', 'email']]
         #)
 
-    def search_read(self, request: SearchReadRequest):
+    def search_read(self,
+            model: str,
+            domain: list[tuple[str,str,str]] = [('id', '>', 0)],
+            fields: list[str] = ['name'],
+            limit: Optional[int] = None,
+            order: Optional[str] = None
+        ):#request: SearchReadRequest):
         # domain: list[tuple[str, str, str]] = None, fields: list[str] = None):
         '''
         Search and read records from the specified model.
-        :param model: The name of the model to search and read from.
-        :param domain: A list of tuples representing the search criteria.
-                       Each tuple should be in the format (field_name, operator, value).
-        :param fields: A list of field names to retrieve.
+            - model (str): The name of the Odoo model to query.
+            - domain (list[tuple[str, str, str]] | None): The domain filter for the search.
+            - fields (list[str]): The list of fields to retrieve from the model.
+            - limit (int | None): The maximum number of records to return.
+            - order (str | None): The order in which to return the records.
         :return: A list of dictionaries representing the records that match the search criteria.
         '''
         # Ejemplo de Gemini:
@@ -120,42 +121,70 @@ class OdooClientServer:
         #     [[('customer_rank', '>', 0)]],
         #     {'fields': ['name', 'phone'], 'limit': 10, 'order': 'name asc'}
         # )
-        if domain is None:
-            domain = []
+        query_structure = {'fields': fields}
 
-        if fields is None:
-            fields = ['name']
+        if limit is not None:
+            query_structure['limit'] = limit
+        if order is not None:
+            query_structure['order'] = order
+
+        query = query_structure
 
         return self.models.execute_kw(
             self.db, self.uid, self.password,
-            request.model, request.action,
-            [request.domain], request.query
+            model, 'search_read',
+            [domain], query
             )
 
     def create(
-        self, request: CreateRequest, printer = False
+        self,
+        model: str,
+        vals: Union[list[dict], dict],
+        domain_check: Union[list[str], str] = 'name',
+        domain_comp: CompDomain | list[CompDomain] = '=',
+        domains: Optional[ list[tuple[str,str,str]] ] = None,
+        printer = False
         ) -> Response:
         '''
         Create a new record in the specified model.
-        :param model: The name of the model to create a record in.
-        :param vals: A dictionary of field names and values for the new record.
-        :return: The ID of the newly created record.
+            - model (str): The name of the Odoo model to create a record in.
+            - vals (dict | list[dict]): The values for the new record(s).
+            - domain_check (str | list[str], optional): Field(s) to use for domain checking.
+                Defaults to 'name'.
+            - domain_comp (CompDomain | list[CompDomain], optional): Comparison operator(s)
+                for domain checking. Defaults to '='.
+            - search_request (SearchRequest | None, optional): Associated search request
+                for pre-creation checks. Defaults to None.
+            - domains (list[tuple[str, str, str]] | None, optional): Computed domain tuples
+                for searching existing records. Defaults to None.
         '''
 
         response = Response(
             action = 'create',
-            model = request.model
+            model = model
+            )
+        if domains is None:
+            domains = check_domains(
+                domain_check = domain_check,
+                domain_comp = domain_comp,
+                vals = vals
             )
 
-        exists = self.search(request.search_request)
+        exists = self.search(
+            model = model,
+            domains = domains
+        )
+        
         if printer:
-            print("DOMAINS: ", request.domains)
+            print("DOMAINS: ", domains)
             print("Exist: ", exists)
+        
         if not exists:
             try:
+                # CORE ACTIVITY
                 object_id = self.models.execute(
                     self.db, self.uid, self.password,
-                    request.model, request.action, request.vals
+                    model, 'create', vals
                 )
                 response.complete_response(
                     obj_id = object_id,
@@ -184,7 +213,11 @@ class OdooClientServer:
         )
         return response
 
-    def update_single_record(self, request: UpdateRequest , printer = False):
+    def update(self,
+        model: str,
+        records_ids: Union[list[int], int],
+        new_vals: dict,
+        printer = False):
         '''
         Update existing records in the specified model.
         :param model: The name of the model to update records in.
@@ -199,13 +232,13 @@ class OdooClientServer:
 
         response = Response(
             action = 'update',
-            model = request.model,
+            model = model,
             )
         try:
             object_vals = self.models.execute_kw(
                 self.db, self.uid, self.password,
-                request.model, request.action,
-                [request.record_id, request.new_val]
+                model, "write",
+                [records_ids, new_vals]
             )
             response.complete_response(
                     obj_id = object_vals,
@@ -224,7 +257,10 @@ class OdooClientServer:
             return response
         
 
-    def delete(self, request: DeleteRequest, printer = False) -> None:
+    def delete(self,
+        model: str,
+        ids: Union[list[int], int],
+        printer = False) -> None:
         '''
         Delete records from the specified model.
         :param model: The name of the model to delete records from.
@@ -232,15 +268,17 @@ class OdooClientServer:
         :return: True if the deletion was successful, False otherwise.
         '''
         response = Response(
-            action = 'update',
-            model = request.model,
+            action = 'delete',
+            model = model,
             )
+        if isinstance(ids, int):
+            ids = [ids]
         try:
             delete_status = self.models.execute_kw(
                 self.db, self.uid, self.password,
-                request.model, request.action, [request.ids]
+                model, "unlink", [ids]
             )
-            delete_msg = f'Success deleting obj with ID(s): {request.ids}'
+            delete_msg = f'Success deleting obj with ID(s): {ids}'
             response.complete_response(
                 obj_id = delete_status,
                 status = 200,
@@ -290,28 +328,10 @@ class OdooClientServer:
             
         return fields_data
 
-    def read_fields(self, model,
-        domain: list[tuple[str, str, str]] = None, fields: list[str] = None) -> list[dict]:
-        """
-        Combine functions read and search for special fields or
-        models that does not have a field called 'name'
-        """
-
-        return self.read(
-            ReadRequest(
-                model = model,
-                ids = self.search(
-                    SearchRequest(
-                        model = model,
-                        domains = domain
-                    )
-                ),
-                fields = fields
-            )
-        )
-
-    def print_fields(self, model,
-    interest_fields: set | list = InterestFields, get_values=False) -> None | list:
+    def print_fields(
+        self, model,
+        interest_fields: list | tuple = InterestFields, get_values=False
+    ) -> None | list:
         """
         Print fields from a model
         :param model: Model name
@@ -336,6 +356,7 @@ class OdooClientServer:
         pprint(
             clean_fields
         )
+
         if get_values:
             return list(clean_fields.keys())
 
@@ -346,7 +367,7 @@ def create_models_file(
     xlsx_file = DEFAULT_XLSX_FILE) -> None:
     """
     Create a CSV file with the models and their descriptions.
-    :param client: OdooClientServer instance
+    :param client: OdooClient instance
     :return: None
     """
 
