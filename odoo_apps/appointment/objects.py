@@ -3,9 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from constants.account import PARTNER_ID, DOCTOR_RESOURCE_ID, DOCTOR_APPT_TYPE
-
-from odoo_apps.helpers.time_management import standarize_datetime
+from odoo_apps.utils.time_management import standarize_datetime
 from odoo_apps.calendar.objects import Event, Alarm, BASIC_ALARM
 from odoo_apps.type_hints.time_zone import TimeZone
 
@@ -33,10 +31,10 @@ class Appointment:
     """
     start_datetime: datetime
     end_datetime: datetime
+    resource_id: int
+    type_id: int
+    partner_id: int
     name: str = 'Consulta' # Odoo often generates the name
-    resource_id: int = DOCTOR_RESOURCE_ID
-    type_id: int = DOCTOR_APPT_TYPE
-    partner_id: int = PARTNER_ID
     location: str = "Consultorio Privado 101"
     description: str = "Consulta de prueba"
     capacity_reserved: int = 1
@@ -64,6 +62,11 @@ class Appointment:
             description = self.description,
             location = self.location,
             timezone_str = self.timezone_str
+        )
+
+        self.event.add_appointment_data(
+            appt_type_id = self.type_id,
+            partner_id = self.partner_id
         )
     def extract_booking_data(self):
         return {
