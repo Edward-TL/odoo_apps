@@ -4,12 +4,12 @@ STOCK MANAGER functions
 import pytest
 from dotenv import dotenv_values
 
-from odoo_pyrpc.models import PRODUCT
-from odoo_pyrpc.client import OdooClientServer
-from odoo_pyrpc.apps.stock.stock_manager import StockManager
+from odoo_apps.models import PRODUCT
+from odoo_apps.client import OdooClient
+from odoo_apps.stock.manager import StockManager
 
 config = dotenv_values('./tests/test.env')
-odoo = OdooClientServer(
+odoo = OdooClient(
     user_info = config
     )
 
@@ -73,12 +73,12 @@ class TestStockManager:
         """
         Adding values to attribute
         """
-        attribute_id = stock_manager.append_attribute_value(
+        response = stock_manager.append_attribute_value(
             attribute_id = CREATION_TEST_SELECT_ATTR,
             name = "Nuevo valor en select"
         )
 
-        assert attribute_id > 0
+        assert response.object > 0
 
     def test_append_product_multi_attribute_value(self):
         """
@@ -86,7 +86,7 @@ class TestStockManager:
         """
         values = [f'Nuevo multi {n}' for n in range(1,11)]
 
-        val_attributes = [
+        responses = [
             stock_manager.append_attribute_value(
                 attribute_id = CREATION_TEST_MULTI_ATTR,
                 name = value
@@ -94,7 +94,7 @@ class TestStockManager:
         ]
 
         check_vals = [
-            True if isinstance(value, int) else False for value in val_attributes
+            True if isinstance(response.object, int) else False for response in responses
             ]
 
         assert sum(check_vals) == len(values)
@@ -127,7 +127,7 @@ class TestStockManager:
             ]
 
 
-        val_attributes = [
+        responses = [
             stock_manager.append_attribute_value(
                 attribute_id = CREATION_TEST_COLOR_ATTR,
                 name = name,
@@ -136,10 +136,10 @@ class TestStockManager:
         ]
 
         check_vals = [
-            True if isinstance(value, int) else False for value in val_attributes
+            True if isinstance(response.object, int) else False for response in responses
             ]
 
-        assert sum(check_vals) == len(val_attributes)
+        assert sum(check_vals) == len(responses)
 
     def test_delete_tests(self):
         """
@@ -147,20 +147,21 @@ class TestStockManager:
         """
         for test_attribute in creation_attributes:
             odoo.delete(
-                PRODUCT.ATTRIBUTE, ids = odoo.search(
-                    PRODUCT.ATTRIBUTE, [('name', '=', test_attribute)]
+                PRODUCT.ATTRIBUTE,
+                ids = odoo.search(
+                        PRODUCT.ATTRIBUTE, [('name', '=', test_attribute)]
+                    )
                 )
-            )
 
-        vals_check = [
+        attributes = [
             odoo.search(
                 model = PRODUCT.ATTRIBUTE,
-                domain = [('name', '=', test_attribute)]
+                domains = [('name', '=', test_attribute)]
             ) for test_attribute in creation_attributes
         ]
 
         check_vals = [
-            True if isinstance(value, int) else False for value in vals_check
+            True if isinstance(value, int) else False for value in attributes
             ]
 
         assert sum(check_vals) == 0

@@ -5,13 +5,17 @@ from datetime import datetime, timedelta
 
 import pytest
 from dotenv import dotenv_values
+import json
 
-from odoo_apps.client import OdooClientServer
-from odoo_apps.appointment.appt_manager import AppointmentManager
-from constants.account import DOCTOR_APPT_TYPE, DOCTOR_RESOURCE_ID
+from odoo_apps.client import OdooClient
+from odoo_apps.appointment.manager import AppointmentManager
+
+
+DOCTOR_APPT_TYPE = 4
+DOCTOR_RESOURCE_ID = 1 
 
 config = dotenv_values('./tests/test.env')
-odoo = OdooClientServer(
+odoo = OdooClient(
     user_info = config
     )
 def create_test_date() -> datetime:
@@ -29,7 +33,7 @@ def create_test_date() -> datetime:
         year = date.year,
         month = date.month,
         day = appoinment_day,
-        hour = 17
+        hour = 11
     )
 
 
@@ -42,26 +46,37 @@ class TestAppointmentManager:
     def test_book_appointment(self):
         appointment_date_test = create_test_date()
 
-        test_appt = test_appt_manager.extract_appointment_data(
-            {
-                'event_start': appointment_date_test,
-                'event_stop': appointment_date_test + timedelta(hours = 1),
-                'appointment_type_id': DOCTOR_APPT_TYPE,
-                'appointment_resource_id': DOCTOR_RESOURCE_ID,
-                'name': 'Prueba de RPC 5'
-            }
-        )
+        request_test = {
+            'event_start': appointment_date_test,
+            'event_stop': appointment_date_test + timedelta(hours = 1),
+            'appointment_type_id': DOCTOR_APPT_TYPE,
+            'appointment_resource_id': DOCTOR_RESOURCE_ID,
+            'timezone_str': 'UTC',
+            'partner_id': 3,
+            'name': f'Prueba de RPC {appointment_date_test.strftime("%Y-%m-%d %H:%M")}'
+        }
 
-        appt_response = test_appt_manager.book_appointment(test_appt)
+        appt_manager = AppointmentManager(odoo)
+        test_appt = appt_manager.extract_appointment_data(request_test)
+        test_appt_data = test_appt.event.data
+        
+        response = appt_manager.book_appointment(test_appt, printer=False)
+        
+        appt_response = json.loads(response.get_data())
         check = [
+            str(type(response)) == "<class 'flask.wrappers.Response'>",
             isinstance(appt_response, dict),
             'request' in appt_response,
-            appt_response['request']['event_start'] == test_appt['event_start'],
-            appt_response['request']['event_stop'] == test_appt['event_stop'],   
-            appt_response['request']['name'] == test_appt['name'],
+            test_appt_data['name'] == request_test['name'],
 
             appt_response['response']['http_status'] in [201, 200],
-            appt_response['response']['object_id'] > 0
+            appt_response['response']['object'] > 0,
+            appt_response['response']['model'] == 'appointment.booking.line',
+            
+            appt_response['success'] is True
         ]
 
+        for n, c in enumerate(check):
+            print("test_book_appointment checks")
+            print(n, c)
         assert all(check)

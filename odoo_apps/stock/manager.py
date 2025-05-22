@@ -42,7 +42,7 @@ class StockManager:
         Args:
             client: Una instancia de la clase OdooClient.
             category_name (str): El nombre de la nueva categoría.
-            parent_id (int, optional): El ID de la categoría padre. Defaults to False (categoría raíz).
+            parent_id (int, optional): El ID de la categoría padre. Defaults to False [this is root]
 
         Returns:
             int or False: El ID de la nueva categoría creada en Odoo, o False si hubo un error.

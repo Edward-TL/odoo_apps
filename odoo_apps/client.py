@@ -221,14 +221,14 @@ class OdooClient:
         '''
         Update existing records in the specified model.
         :param model: The name of the model to update records in.
-        :param record_id:
+        :param records_ids:
             if int: The ID of the record to update.
             if list: A list of record IDs to update with the given value.
         :param vals: A dictionary of field names and values to update.
         :return: List like [[id, new_val]].
         '''
-        if isinstance(record_id, int):
-            record_id = [record_id]
+        if isinstance(records_ids, int):
+            records_ids = [records_ids]
 
         response = Response(
             action = 'update',

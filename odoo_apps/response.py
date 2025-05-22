@@ -49,7 +49,7 @@ class Response:
     """
     action: Literal['create', 'update', 'delete']
     model: str
-    object_id: int | list[int] | list[[int, str]] | bool | None = None
+    object: int | list[int] | list[list[int, str]] | bool | None = None
     status: StatusMeaning = 'SUCCESS'
     http_status: HttpStatus = 201
     msg: str | None = None
@@ -66,7 +66,7 @@ class Response:
             message += f"Error: {error_message}"
         message += f"Action: {self.action} | "
         message += f"Model: {self.model} | "
-        message += f"[ID]: {self.object_id}"
+        message += f"[ID]: {self.object}"
 
         self.msg = message
 
@@ -81,14 +81,13 @@ class Response:
         printer = False
         ):
 
-        self.object_id = obj_id
+        self.object = obj_id
         self.status = http_meaning[status]
         self.http_status = status
         if msg != "":
             self.msg = msg
         else:
-            self.msg = meaning[status]
-        self.update_message()
+            self.update_message()
 
         if printer:
             self.print()
@@ -98,7 +97,7 @@ class Response:
         return {
             "action": self.action,
             "model": self.model,
-            "object_id": self.object_id,
+            "object": self.object,
             "status": self.status,
             "http_status": self.http_status,
             "msg": self.msg

@@ -5,11 +5,18 @@ import pytest
 from dotenv import dotenv_values
 
 from odoo_apps.models import PRODUCT
-from odoo_apps.client import OdooClientServer
-from odoo_apps.stock.stock_manager import StockManager
+from odoo_apps.client import OdooClient
+from odoo_apps.request import (
+    SearchReadRequest,
+    SearchRequest,
+    UpdateRequest,
+    DeleteRequest
+)
+
+from odoo_apps.stock.manager import StockManager
 
 config = dotenv_values('./tests/test.env')
-odoo = OdooClientServer(
+odoo = OdooClient(
     user_info = config
     )
 
@@ -27,9 +34,9 @@ class TestOdooClient:
         Simple search_read functional test
         """
         response = odoo.search_read(
-            model = PRODUCT.CATEGORY,
-            domain = [(['parent_id', '=', False])]
-            )
+                model = PRODUCT.CATEGORY,
+                domain = [(['parent_id', '=', False])]
+        )
 
         categories_test = [
             {'id': 1, 'name': "All"},
@@ -50,12 +57,12 @@ class TestOdooClient:
             category_name = CREATION_TEST_CATEGORY
         )
 
-        response = odoo.search_read(
+        categories = odoo.search_read(
             model = PRODUCT.CATEGORY,
             domain = [(['parent_id', '=', False])]
-            )
+        )
 
-        for category in response:
+        for category in categories:
             if category['name'] == CREATION_TEST_CATEGORY:
                 assert category['id'] > 0
                 break
@@ -64,33 +71,33 @@ class TestOdooClient:
         """
         Simple search_read functional test
         """
-        response = odoo.search(
+        categories = odoo.search(
             model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', CREATION_TEST_CATEGORY])]
-            )
+            domains = [(['name', '=', CREATION_TEST_CATEGORY])]
+        )
         # print(f"{CREATION_TEST_CATEGORY} IDs: {response}")
-        assert len(response) > 0
+        assert len(categories) > 0
 
     def test_update_test_category(self):
         """
         Simple search_read functional test
         """
-        response = odoo.search(
+        test_ids = odoo.search(
             model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', CREATION_TEST_CATEGORY])]
-            )
+            domains = [(['name', '=', CREATION_TEST_CATEGORY])]
+        )
         
-        odoo.update_single_record(
+        odoo.update(
             model = PRODUCT.CATEGORY,
             # MUST BE a single integer
-            record_id = response[0],
-            new_val = {'name': UPDATE_TEST_CATEGORY}
+            records_ids = test_ids[0],
+            new_vals = {'name': UPDATE_TEST_CATEGORY}
         )
 
         update_confirmation_response = odoo.search(
             model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
-            )
+            domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+        )
         assert len(update_confirmation_response) > 0
 
     def test_create_child_category(self):
@@ -100,9 +107,9 @@ class TestOdooClient:
         test_stock_manager = StockManager(client = odoo)
         
         response = odoo.search(
-            model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
-            )
+                model = PRODUCT.CATEGORY,
+                domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+        )
         
         test_stock_manager.create_product_category(
             category_name = CHILD_TEST_CATEGORY,
@@ -110,9 +117,9 @@ class TestOdooClient:
         )
 
         child_response = odoo.search(
-            model = PRODUCT.CATEGORY,
-            domain = [(['parent_id', '=', response[0]])]
-            )
+                model = PRODUCT.CATEGORY,
+                domains = [(['parent_id', '=', response[0]])]
+        )
 
         assert len(child_response) > 0
 
@@ -123,13 +130,13 @@ class TestOdooClient:
         
         parents_id = odoo.search(
             model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
-            )
+            domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+        )
 
         child_id = odoo.search(
             model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', CHILD_TEST_CATEGORY])]
-            )[0]
+            domains = [(['name', '=', CHILD_TEST_CATEGORY])]
+        )[0]
 
         delete_ids = [id_ for id_ in parents_id]
         delete_ids.append(child_id)
@@ -148,19 +155,16 @@ class TestOdooClient:
 
         # print(f"Delete Confirmation response: {delete_confirmation_response}")
 
-        assert len(odoo.search(
-            model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
-            )) == 0
+        assert len(
+            odoo.search(
+                model = PRODUCT.CATEGORY,
+                domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+            )
+        ) == 0
 
-        assert len(odoo.search(
-            model = PRODUCT.CATEGORY,
-            domain = [(['name', '=', CHILD_TEST_CATEGORY])]
-            )) == 0
-
-
-if __name__ == "__main__":
-    from .project_path import add_project_path
-
-    add_project_path()
-    print(config)
+        assert len(
+            odoo.search(
+                model = PRODUCT.CATEGORY,
+                domains = [(['name', '=', CHILD_TEST_CATEGORY])]
+            )
+        ) == 0

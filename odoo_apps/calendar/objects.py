@@ -84,14 +84,14 @@ class Event:
         # Convertir las datetimes a UTC, que es la zona horaria que Odoo espera para el almacenamiento.
         # Asumimos que las datetimes proporcionadas ya están en la timezone_str especificada.
         start_naive = self.start_datetime.replace(tzinfo=None)
-        print("start_naive: ", start_naive)
+        # print("start_naive: ", start_naive)
         end_naive = self.end_datetime.replace(tzinfo=None)
-        print("end_naive: ", end_naive)
+        # print("end_naive: ", end_naive)
 
         self.start_utc = start_naive.astimezone(timezone(self.timezone_str))
-        print("start_utc: ", self.start_utc)
+        # print("start_utc: ", self.start_utc)
         self.end_utc = end_naive.astimezone(timezone(self.timezone_str))
-        print("end_utc: ", self.end_utc)
+        # print("end_utc: ", self.end_utc)
 
         diferencia = abs(self.end_datetime - self.start_datetime)
         diferencia_en_horas = diferencia.total_seconds() / 3600

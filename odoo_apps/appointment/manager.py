@@ -94,7 +94,8 @@ class AppointmentManager:
                                       or the ID(s) of existing appointment(s) if found (PASS),
                                       or None if an error occurred (FAIL).
         """
-        pprint(appointment.extract_booking_data())
+        if printer:
+            pprint(appointment.extract_booking_data())
 
         if appointment.calendar_event_id is None:
             # appointment.event

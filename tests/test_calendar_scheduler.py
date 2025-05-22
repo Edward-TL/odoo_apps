@@ -5,12 +5,12 @@ from datetime import datetime
 import pytest
 from dotenv import dotenv_values
 
-from odoo_apps.client import OdooClientServer
+from odoo_apps.client import OdooClient
 from odoo_apps.calendar import Scheduler
 from odoo_apps.calendar.objects import Event, BASIC_ALARM
 
 config = dotenv_values('./tests/test.env')
-odoo = OdooClientServer(
+odoo = OdooClient(
     user_info = config
     )
 
@@ -29,7 +29,7 @@ class TestScheduler:
     def test_schedule_notification(self):
         
 
-        event1_id = scheduler.create_calendar_event(
+        response = scheduler.create_calendar_event(
             event = Event(
                 name = "prueba de evento",
                 start_datetime = datetime(2025, 5, 13, 16, 0, 0),
@@ -41,7 +41,7 @@ class TestScheduler:
                 timezone_str = "UTC",
             )
         )
-        
+        event1_id = response.object
         print(f"Evento 1 creado con ID: {event1_id}")
         assert event1_id > 0
 

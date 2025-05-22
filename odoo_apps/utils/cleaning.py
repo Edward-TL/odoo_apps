@@ -53,7 +53,7 @@ def gen_domains_from_str(domain_check, domain_comp, vals):
 
     return domains
 
-def gen_domains_from_list(domain_check, domain_comp, vals):
+def gen_domains_from_list(domain_check, domain_comp, vals, printer=False):
     """
     Generates a list of Odoo domain tuples from provided domain field names, comparison operators, and values.
     Args:
@@ -68,7 +68,8 @@ def gen_domains_from_list(domain_check, domain_comp, vals):
     """
     domains = []
     if isinstance(domain_check, list):
-        print('Domain Check is List')
+        if printer:
+            print('Domain Check is List')
         if isinstance(vals, list):
             for domain, comp in zip(domain_check, domain_comp):
                 for value in vals:
@@ -77,9 +78,10 @@ def gen_domains_from_list(domain_check, domain_comp, vals):
                             domains.append((domain, comp, v))
 
         if isinstance(vals, dict):
-            print('Just one dictionary values')
-            print(domain_check, domain_comp)
-            print(vals)
+            if printer:
+                print('Just one dictionary values')
+                print(domain_check, domain_comp)
+                print(vals)
             for domain, comp in zip(domain_check, domain_comp):
                 for k, v in vals.items():
                     if k == domain:
