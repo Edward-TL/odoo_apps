@@ -1,4 +1,4 @@
 """
 STOCK init file
 """
-from odoo_apps.helpers.time_management import standarize_datetime
+from odoo_apps.utils.time_management import standarize_datetime

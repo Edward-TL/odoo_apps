@@ -4,8 +4,8 @@ TODO:
 * Diseñar las funciones para la concatenacion de las columnas correspondientes
 """
 
-from typing import Literal
 from inspect import getmembers
+from typing import Literal
 
 CompDomain = Literal['=', '<', '>', '<=', '>=', '!=']
 
