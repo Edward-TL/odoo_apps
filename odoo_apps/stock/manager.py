@@ -3,11 +3,10 @@
 
 from dataclasses import dataclass
 # import pandas as pd
-from odoo_apps.client import OdooClientServer  # Importa la clase para la conexión a Odoo
-from odoo_apps.models import PRODUCT, STOCK  # Importa los modelos de Odoo
+from odoo_apps.client import OdooClient
+from odoo_apps.response import Response
+from odoo_apps.models import PRODUCT, STOCK
 from odoo_apps.type_hints.stock import DisplayTypes, CreateVariants
-
-from odoo_apps.response import Response #, standarize_response
 
 @dataclass
 class StockManager:
@@ -15,9 +14,9 @@ class StockManager:
     Inicializa el StockManager con un cliente de Odoo ya configurado.
 
     Args:
-        odoo_client: Una instancia de la clase OdooClientServer.
+        odoo_client: Una instancia de la clase OdooClient.
     """
-    client: OdooClientServer
+    client: OdooClient
 
 
     def _find_internal_location(self):
@@ -27,8 +26,10 @@ class StockManager:
         Returns:
             int or False: El ID de la ubicación interna o False si no se encuentra.
         """
-        domain = [('usage', '=', 'internal')]
-        location_ids = self.client.search(STOCK.LOCATION, domain)
+        location_ids = self.client.search(
+            model = STOCK.LOCATION,
+            domains = [('usage', '=', 'internal')]
+        )
         if location_ids:
             return location_ids[0]
         return False
@@ -39,7 +40,7 @@ class StockManager:
         Crea una nueva categoría de producto en Odoo.
 
         Args:
-            client: Una instancia de la clase OdooClientServer.
+            client: Una instancia de la clase OdooClient.
             category_name (str): El nombre de la nueva categoría.
             parent_id (int, optional): El ID de la categoría padre. Defaults to False (categoría raíz).
 
@@ -55,7 +56,7 @@ class StockManager:
         category_response = self.client.create(
             model = PRODUCT.CATEGORY,
             vals = category_data
-            )
+        )
 
         return category_response
         
@@ -89,15 +90,17 @@ class StockManager:
         """
         # If it's a string, it's because it's not known the attribute_id
         if isinstance(attribute_id, str):
-            domain_field = "name"
-            domain_model = PRODUCT.ATTRIBUTE
-            domain_value = [(domain_field, '=', attribute_id)]
-            attribute_id = self.client.search(domain_model, domain_value)
+            attribute_id = self.client.search(
+                model = PRODUCT.ATTRIBUTE,
+                domains = [('name', '=', attribute_id)]
+            )
 
             if isinstance(attribute_id, list):
                 attribute_id = attribute_id[0]
             else:
-                attribute_id = self.client.create(PRODUCT.ATTRIBUTE, {'name':name})
+                attribute_id = self.client.create(
+                    PRODUCT.ATTRIBUTE, {'name':name}
+            )
         
         attribute_data = {
                 'name': name,
@@ -113,8 +116,8 @@ class StockManager:
             attribute_data['image'] = image
 
         att_val_response = self.client.create(
-            PRODUCT.ATTRIBUTE_VALUE,
-            attribute_data
+                PRODUCT.ATTRIBUTE_VALUE,
+                attribute_data
         )
 
         return att_val_response

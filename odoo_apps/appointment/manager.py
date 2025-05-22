@@ -2,25 +2,33 @@
 apps/appointment/appt_manager.py
 Appointment Manager file
 """
-from copy import copy
 from dataclasses import dataclass
 from pprint import pprint
-from typing import List, Optional
 
 from odoo_apps.calendar.scheduler import Scheduler
 
-from odoo_apps.client import OdooClientServer # Asegúrate de importar Printer si la usas directamente
-from odoo_apps.models import APPOINTMENT # Importa la clase APPOINTMENT de models.py
+from odoo_apps.client import OdooClient
+from odoo_apps.models import APPOINTMENT
 from odoo_apps.response import Response, standarize_response
-from odoo_apps.request import CreateRequest, SearchRequest
-from .objects import Appointment # Importa la clase Appointment que acabas de crear
+from .objects import Appointment
 
 @dataclass
 class AppointmentManager:
     """
     Manages interactions with Odoo's appointment.appointment model via RPC.
     """
-    client: OdooClientServer
+    client: OdooClient
+    request_fields = tuple([
+        'event_start',
+        'event_stop',
+        'name',
+        'appointment_resource_id',
+        'appointment_type_id',
+        'timezone_str',
+        'partner_id',
+        'client_reference_field',
+        'client_reference_value'
+    ])
     def __post_init__(self):
         self.scheduler = Scheduler(self.client)
 
@@ -50,13 +58,11 @@ class AppointmentManager:
             )
         if request['appointment_type_id'] is None:
             existing_ids = self.client.search(
-                SearchRequest(
-                    model = APPOINTMENT.TYPE,
-                    domain = [
-                        ('active', '=', True),
-                        ('name', '=', request['name_type'])
-                    ]
-                )
+                model = APPOINTMENT.TYPE,
+                domains = [
+                    ('active', '=', True),
+                    ('name', '=', request['name_type'])
+                ]
             )
             if len(existing_ids) > 1:
                 request['appointment_type_id'] = existing_ids
@@ -64,12 +70,13 @@ class AppointmentManager:
                 request['appointment_type_id'] = existing_ids[0]
 
         appointment = Appointment(
-            start_datetime = request.get('event_start'),
-            end_datetime = request.get('event_stop'),
-            name = request.get('name', 'Prueba de Consulta'),
-            resource_id = request.get('appointment_resource_id'),
-            type_id = request.get('appointment_type_id'),
-            timezone_str = request.get('timezone_str', 'UTC')
+            start_datetime = request['event_start'],
+            end_datetime = request['event_stop'],
+            name = request['name'],
+            resource_id = request['appointment_resource_id'],
+            type_id = request['appointment_type_id'],
+            timezone_str = request['timezone_str'],
+            partner_id = request['partner_id']
         )
 
 
@@ -90,14 +97,15 @@ class AppointmentManager:
         pprint(appointment.extract_booking_data())
 
         if appointment.calendar_event_id is None:
-            event_data = copy(appointment.event.data)
-            event_data['res_model_id'] = 861 # appointment.type
-            event_data['current_status'] = 'accepted'
-            event_data['appointment_type_id'] = appointment.type_id
-            event_data['appointment_type_schedule_based_on'] = 'resources'
-            event_data['current_attendee'] = appointment.partner_id
+            # appointment.event
+            # event_data = copy(appointment.event.data)
+            # event_data['res_model_id'] = 861 # appointment.type
+            # event_data['current_status'] = 'accepted'
+            # event_data['appointment_type_id'] = appointment.type_id
+            # event_data['appointment_type_schedule_based_on'] = 'resources'
+            # event_data['current_attendee'] = appointment.partner_id
             
-            appointment.event.data = event_data
+            # appointment.event.data = event_data
             if printer:
                 print('appointment.event.data')
                 print(appointment.event.data)
@@ -110,7 +118,7 @@ class AppointmentManager:
                 print("CALENDAR RESPONSE ")
                 calendar_response.print()
 
-            appointment.calendar_event_id = calendar_response.object_id
+            appointment.calendar_event_id = calendar_response.object
     
             if printer:
                 pprint(appointment.extract_booking_data())
@@ -120,12 +128,10 @@ class AppointmentManager:
             # We don't need domain_check here because we did the check manually above.
             # Pass printer=True to enable the printing from the client method.
             appt_response = self.client.create(
-                CreateRequest(
-                    model = APPOINTMENT.BOOKING_LINE,
-                    vals = appointment.extract_booking_data(),
-                    domain_check = ['event_start', 'event_stop'],
-                    domain_comp = ['=', '=']
-                ),
+                model = APPOINTMENT.BOOKING_LINE,
+                vals = appointment.extract_booking_data(),
+                domain_check = ['event_start', 'event_stop'],
+                domain_comp = ['=', '='],
                 printer=printer
                 # domain_check and domain_comp are not needed due to manual check
             )
