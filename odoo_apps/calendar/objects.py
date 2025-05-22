@@ -117,3 +117,16 @@ class Event:
         'allday': self.is_all_day,  # Por defecto, los self.s tienen una hora específica
         'event_tz': self.timezone_str, # Almacenar la zona horaria para la visualización
         }
+
+    def add_appointment_data(
+        self, appt_type_id, partner_id, based_on='resources'
+        ) -> None:
+        """
+        Used for Appointment objects, that requires this data for
+        booking an appointment.
+        """
+        self.data['res_model_id'] = 861 # appointment.type
+        self.data['current_status'] = 'accepted'
+        self.data['appointment_type_id'] = appt_type_id
+        self.data['appointment_type_schedule_based_on'] = based_on
+        self.data['current_attendee'] = partner_id
