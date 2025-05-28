@@ -31,9 +31,9 @@ class Appointment:
     """
     start_datetime: datetime
     end_datetime: datetime
-    resource_id: int
+    resource_ids: int
     type_id: int
-    partner_id: int
+    partner_ids: int | list[int]
     name: str = 'Consulta' # Odoo often generates the name
     location: str = "Consultorio Privado 101"
     description: str = "Consulta de prueba"
@@ -57,7 +57,7 @@ class Appointment:
             name = self.name,
             start_datetime = self.start_datetime,
             end_datetime = self.end_datetime,
-            partner_ids = self.partner_id,
+            partner_ids = self.partner_ids,
             alarm_ids = self.alarm_id,
             description = self.description,
             location = self.location,
@@ -66,19 +66,22 @@ class Appointment:
 
         self.event.add_appointment_data(
             appt_type_id = self.type_id,
-            partner_id = self.partner_id
+            partner_ids = self.partner_ids
         )
+
     def extract_booking_data(self):
         return {
             # 'active': True,
-            'appointment_resource_id': self.resource_id,
+            'appointment_resource_id': self.resource_ids,
             'appointment_type_id': self.type_id,
             'capacity_reserved': self.capacity_reserved,
             'capacity_used': self.capacity_used,
             'calendar_event_id': self.calendar_event_id,
             'event_start': self.start_utc_str, # Odoo uses 'start' and 'stop' for datetimes
             'event_stop': self.end_utc_str,
-            'display_name': self.event.name
+            'display_name': self.event.name,
+            # DOES NOT EXIST ON MODEL. DON'T ADD IT
+            # 'partner_ids': self.partner_ids
             # 'create_uid': self.partner_id
         }
 

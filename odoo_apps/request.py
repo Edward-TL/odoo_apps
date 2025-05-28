@@ -10,7 +10,8 @@ odoo.search(
 from dataclasses import dataclass, field
 from typing import Literal, Optional, Union
 
-from .utils.cleaning import check_domains, CompDomain
+from .utils.cleaning import check_domains
+from .utils.operators import Operator
 
 RequestAction = Literal[
     'search',
@@ -20,6 +21,49 @@ RequestAction = Literal[
     'write',
     'unlink'
 ]
+
+# Just an idea that I'm thinking around
+# @dataclass
+# class Request:
+#     json_data: dict
+#     model: str
+#     domains: list[str, Operator, str] | list[list[str, Operator, str]]
+#     action: RequestAction
+#     ids: list[int]
+#     fields: list[str] = field(default_factory = ['name'])
+#     limit: Optional[int] = None
+#     order: Optional[str] = None
+#     vals: Union[list[dict], dict]
+#     domain_check: Union[list[str], str] = 'name'
+#     domain_comp: Operator | list[Operator] = '='
+    
+#     domains: Optional[ list[tuple[str, Operator, str]] ] = None
+
+#     # search_request: Optional[SearchRequest] = None
+
+#     def __post_init__(self):
+#         if isinstance(self.domains[0], str):
+#             self.domains = [self.domains]
+
+#         query_structure = {'fields': self.fields}
+
+#         if self.limit is not None:
+#             query_structure['limit'] = self.limit
+#         if self.order is not None:
+#             query_structure['order'] = self.order
+
+#         self.query = query_structure
+
+#         self.domains = check_domains(
+#             domain_check = self.domain_check,
+#             domain_comp = self.domain_comp,
+#             vals = self.vals
+#         )
+
+#         self.search_request = SearchRequest(
+#             model = self.model,
+#             domains = self.domains
+#         )
 
 @dataclass
 class SearchRequest:
@@ -34,7 +78,7 @@ class SearchRequest:
             representing a complex domain.
     """
     model: str
-    domains: list[str,str,str] | list[list[str,str,str]]
+    domains: list[str, Operator, str] | list[list[str, Operator, str]]
     action: RequestAction = 'search'
 
     def __post_init__(self):
@@ -114,15 +158,15 @@ class CreateRequest:
     model: str
     vals: Union[list[dict], dict]
     domain_check: Union[list[str], str] = 'name'
-    domain_comp: CompDomain | list[CompDomain] = '='
+    domain_comp: Operator | list[Operator] = '='
     search_request: Optional[SearchRequest] = None
-    domains: Optional[ list[tuple[str,str,str]] ] = None
+    domains: Optional[ list[tuple[str, Operator, str]] ] = None
     action = 'create'
 
     def __post_init__(self):
         self.domains = check_domains(
-            domain_check = self.domain_check,
-            domain_comp = self.domain_comp,
+            domain_fields = self.domain_check,
+            domain_operators = self.domain_comp,
             vals = self.vals
         )
 

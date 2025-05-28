@@ -119,7 +119,7 @@ class Event:
         }
 
     def add_appointment_data(
-        self, appt_type_id, partner_id, based_on='resources'
+        self, appt_type_id, partner_ids, based_on='resources'
         ) -> None:
         """
         Used for Appointment objects, that requires this data for
@@ -129,4 +129,4 @@ class Event:
         self.data['current_status'] = 'accepted'
         self.data['appointment_type_id'] = appt_type_id
         self.data['appointment_type_schedule_based_on'] = based_on
-        self.data['current_attendee'] = partner_id
+        self.data['current_attendee'] = partner_ids

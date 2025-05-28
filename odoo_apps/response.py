@@ -5,6 +5,7 @@ Standard response
 from dataclasses import dataclass
 from typing import Literal, Union
 from flask import Flask, make_response, jsonify
+from flask import Response as FlaskResponse
 
 from .request import (
     SearchRequest,
@@ -18,17 +19,22 @@ from .utils.cleaning import generate_dict
 
 meaning = {
     201: 'Succes on creating',
-    200: 'Object already exists'
+    200: 'Object already exists',
+    400: 'Something went wrong with the request',
+    406: 'Server could not produce an acceptable response',
+    409: 'Request OK. Not available'
 }
 
 http_meaning = {
     201: 'SUCCESS',
     200: 'PASS',
-    406: 'FAIL'
+    400: 'BAD REQUEST',
+    406: 'NOT ACCEPTABLE',
+    409: 'CONFLICT'
 }
 
-HttpStatus = Literal[201, 200, 406]
-StatusMeaning = Literal['SUCCESS', 'PASS', 'FAIL']
+HttpStatus = Literal[201, 200, 406, 409]
+StatusMeaning = Literal['SUCCESS', 'PASS', 'FAIL', 'CONFLICT']
 
 
 # Just an Idea, that will evolve
@@ -61,7 +67,7 @@ class Response:
         message = ""
         message += f"{self.status} | "
         if self.status != 'FAIL':
-            message += f"Message: {meaning[self.http_status]}"
+            message += f"Message: {meaning[self.http_status]} | "
         else:
             message += f"Error: {error_message}"
         message += f"Action: {self.action} | "
@@ -102,9 +108,24 @@ class Response:
             "http_status": self.http_status,
             "msg": self.msg
         }
+    
 
+def report_fail(
+        action: Literal['create', 'update', 'delete'],
+        model: str,
+        http_status: HttpStatus,
+        msg: str) -> Response:
+    
+    return Response(
+        action = action,
+        model = model,
+        object = None,
+        status = http_meaning[http_status],
+        http_status = http_status,
+        msg = msg
+    )
 
-def standarize_response(request: Request, response: Response) -> dict:
+def standarize_response(request: Request, response: Response) -> FlaskResponse:
     """
     Function to simplifys the reponse generation
     """

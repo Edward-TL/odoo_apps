@@ -18,7 +18,8 @@ from pprint import pprint
 
 import pandas as pd
 
-from .utils.cleaning import check_domains, CompDomain
+from .utils.cleaning import check_domains
+from .utils.operators import Operator
 from .response import Response
 
 InterestFields = tuple(['string', 'help', 'type', 'selection'])
@@ -140,22 +141,27 @@ class OdooClient:
         self,
         model: str,
         vals: Union[list[dict], dict],
-        domain_check: Union[list[str], str] = 'name',
-        domain_comp: CompDomain | list[CompDomain] = '=',
-        domains: Optional[ list[tuple[str,str,str]] ] = None,
+        domain_fields: Union[list[str], str] = 'name',
+        domain_operators: Operator | list[Operator] = '=',
+        domains: Optional[ list[tuple[str, Operator, str]] ] = None,
         printer = False
         ) -> Response:
         '''
         Create a new record in the specified model.
             - model (str): The name of the Odoo model to create a record in.
             - vals (dict | list[dict]): The values for the new record(s).
-            - domain_check (str | list[str], optional): Field(s) to use for domain checking.
+            - domain_fields (str | list[str], optional): Field(s) to use for domain checking.
+                If the field is a date(time) field, you can also specify a part of the date using
+                'field_name.granularity'. The supported granularities are 'year_number',
+                'quarter_number', 'month_number', 'iso_week_number', 'day_of_week', 'day_of_month',
+                'day_of_year', 'hour_number', 'minute_number', 'second_number'. They all use an integer as value.
+                
                 Defaults to 'name'.
-            - domain_comp (CompDomain | list[CompDomain], optional): Comparison operator(s)
+            - domain_comp (Operator | list[Operator], optional): Comparison operator(s)
                 for domain checking. Defaults to '='.
             - search_request (SearchRequest | None, optional): Associated search request
                 for pre-creation checks. Defaults to None.
-            - domains (list[tuple[str, str, str]] | None, optional): Computed domain tuples
+            - domains (list[tuple[field, Operator, value]], optional): Computed domain tuples
                 for searching existing records. Defaults to None.
         '''
 
@@ -165,8 +171,8 @@ class OdooClient:
             )
         if domains is None:
             domains = check_domains(
-                domain_check = domain_check,
-                domain_comp = domain_comp,
+                domain_fields = domain_fields,
+                domain_operators = domain_operators,
                 vals = vals
             )
 

@@ -213,3 +213,26 @@ class Resource:
         return string_class(self)
 
 RESOURCE = Resource()
+
+@dataclass
+class Contacts:
+    """
+    Tables here are the one related to the Contacts info
+    """
+    _name = 'res'
+    COMPANY = 'res.company'
+    GROUPS = 'res.groups'
+    PARTNER_BANK = 'res.partner.bank'
+    PARTNER_CATEGORY = 'res.partner.category'
+    PARTNER_INDUSTRY = 'res.partner.industry'
+    PARTNER_TITLE = 'res.partner.title'
+    PARTNER = 'res.partner'
+    USERS = 'res.users'
+
+    def __post_init__(self):
+        self._modules = generate_dict(self)
+
+    def __str__(self):
+        return string_class(self)
+    
+CONTACTS = Contacts()

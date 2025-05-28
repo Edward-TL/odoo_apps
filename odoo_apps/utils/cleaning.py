@@ -6,8 +6,7 @@ TODO:
 
 from inspect import getmembers
 from typing import Literal
-
-CompDomain = Literal['=', '<', '>', '<=', '>=', '!=']
+from .operators import Operator
 
 
 def generate_dict(data_obj) -> dict:
@@ -53,7 +52,7 @@ def gen_domains_from_str(domain_check, domain_comp, vals):
 
     return domains
 
-def gen_domains_from_list(domain_check, domain_comp, vals, printer=False):
+def gen_domains_from_list(domain_fields, domain_operators, vals, printer=False):
     """
     Generates a list of Odoo domain tuples from provided domain field names, comparison operators, and values.
     Args:
@@ -67,11 +66,11 @@ def gen_domains_from_list(domain_check, domain_comp, vals, printer=False):
         # Returns: [('name', '=', 'John'), ('age', '>', 30)]
     """
     domains = []
-    if isinstance(domain_check, list):
+    if isinstance(domain_fields, list):
         if printer:
             print('Domain Check is List')
         if isinstance(vals, list):
-            for domain, comp in zip(domain_check, domain_comp):
+            for domain, comp in zip(domain_fields, domain_operators):
                 for value in vals:
                     for k, v in value.items():
                         if k == domain:
@@ -80,9 +79,9 @@ def gen_domains_from_list(domain_check, domain_comp, vals, printer=False):
         if isinstance(vals, dict):
             if printer:
                 print('Just one dictionary values')
-                print(domain_check, domain_comp)
+                print(domain_fields, domain_operators)
                 print(vals)
-            for domain, comp in zip(domain_check, domain_comp):
+            for domain, comp in zip(domain_fields, domain_operators):
                 for k, v in vals.items():
                     if k == domain:
                         domains.append((domain, comp, v))
@@ -90,16 +89,16 @@ def gen_domains_from_list(domain_check, domain_comp, vals, printer=False):
     return domains
 
 def check_domains(
-    domain_check: str | list, domain_comp: CompDomain, vals: dict | list[dict]
+    domain_fields: str | list, domain_operators: Operator, vals: dict | list[dict]
     ) -> list[tuple]:
     """
     Generate the domains based on the data passed
     """
 
-    if isinstance(domain_check, str):
-        return gen_domains_from_str(domain_check, domain_comp, vals)
+    if isinstance(domain_fields, str):
+        return gen_domains_from_str(domain_fields, domain_operators, vals)
 
-    if isinstance(domain_check, list):
-        return gen_domains_from_list(domain_check, domain_comp, vals)
+    if isinstance(domain_fields, list):
+        return gen_domains_from_list(domain_fields, domain_operators, vals)
 
     return ([],[],[])

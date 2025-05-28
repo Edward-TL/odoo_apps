@@ -1,6 +1,6 @@
 
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from dotenv import dotenv_values
@@ -20,6 +20,23 @@ scheduler = Scheduler(
 
 partners = [3, 35]
 
+def create_test_date() -> datetime:
+    """
+    function made only to return a weekday on work hours
+    """
+    date = datetime.today()
+    appoinment_day = 0
+    if date.weekday() < 4:
+        appoinment_day = int(date.day) + 1
+    else:
+        appoinment_day = int(date.day) + (7 - date.weekday())
+
+        return datetime(
+        year = date.year,
+        month = date.month,
+        day = appoinment_day,
+        hour = 15
+    )
 class TestScheduler:
     """
     Test Scheduler functions
@@ -28,12 +45,13 @@ class TestScheduler:
     # Crear un evento único
     def test_schedule_notification(self):
         
+        event_test_day = create_test_date()
 
         response = scheduler.create_calendar_event(
             event = Event(
                 name = "prueba de evento",
-                start_datetime = datetime(2025, 5, 13, 16, 0, 0),
-                end_datetime = datetime(2025, 5, 13, 17, 0, 0),
+                start_datetime = event_test_day,
+                end_datetime = event_test_day + timedelta(hours = 1),
                 partner_ids = partners, # IDs de los partners (contactos)
                 alarm_ids = BASIC_ALARM,
                 description = "Discusión sobre el proyecto actual.",
@@ -42,7 +60,7 @@ class TestScheduler:
             )
         )
         event1_id = response.object
-        print(f"Evento 1 creado con ID: {event1_id}")
+        print(f"Evento de prueba creado con ID: {event1_id}")
         assert event1_id > 0
 
     # # Crear un evento recurrente semanalmente durante 4 semanas

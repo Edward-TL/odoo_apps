@@ -5,12 +5,24 @@ Appointment Manager file
 from dataclasses import dataclass
 from pprint import pprint
 
-from odoo_apps.calendar.scheduler import Scheduler
+from flask import Response as FlaskResponse
 
 from odoo_apps.client import OdooClient
-from odoo_apps.models import APPOINTMENT
-from odoo_apps.response import Response, standarize_response
+from odoo_apps.models import APPOINTMENT, CALENDAR
+from odoo_apps.response import Response, standarize_response, report_fail
+
+from odoo_apps.calendar.scheduler import Scheduler
 from .objects import Appointment
+
+def create_busy_response(object_id) -> Response:
+    return Response(
+        action = 'create',
+        model = CALENDAR.EVENT,
+        object = object_id,
+        status = 'PASS',
+        http_status = 409,
+        msg = "User is busy. Request is OK. Try other time"
+    )
 
 @dataclass
 class AppointmentManager:
@@ -31,6 +43,16 @@ class AppointmentManager:
     ])
     def __post_init__(self):
         self.scheduler = Scheduler(self.client)
+
+    def get_booking_url(self, appointment_type_id: int):
+        """
+        Returns the webpage url to schedule and appointment by website
+        """
+        return self.client.search_read(
+            model = APPOINTMENT.INVITE,
+            domain = [('appointment_type_ids','=', appointment_type_id)],
+            fields = ['book_url']
+        )[0]['book_url']
 
     def extract_appointment_data(self, request: dict) -> Appointment:
         """
@@ -73,16 +95,16 @@ class AppointmentManager:
             start_datetime = request['event_start'],
             end_datetime = request['event_stop'],
             name = request['name'],
-            resource_id = request['appointment_resource_id'],
+            resource_ids = request['appointment_resource_id'],
             type_id = request['appointment_type_id'],
             timezone_str = request['timezone_str'],
-            partner_id = request['partner_id']
+            partner_ids = request['partner_ids']
         )
 
 
         return appointment
 
-    def book_appointment(self, appointment: Appointment, printer=False) -> dict:
+    def book_appointment(self, appointment: Appointment, printer=False) -> FlaskResponse:
         """
         Creates a new appointment in Odoo using RPC.
 
@@ -98,15 +120,7 @@ class AppointmentManager:
             pprint(appointment.extract_booking_data())
 
         if appointment.calendar_event_id is None:
-            # appointment.event
-            # event_data = copy(appointment.event.data)
-            # event_data['res_model_id'] = 861 # appointment.type
-            # event_data['current_status'] = 'accepted'
-            # event_data['appointment_type_id'] = appointment.type_id
-            # event_data['appointment_type_schedule_based_on'] = 'resources'
-            # event_data['current_attendee'] = appointment.partner_id
-            
-            # appointment.event.data = event_data
+
             if printer:
                 print('appointment.event.data')
                 print(appointment.event.data)
@@ -116,40 +130,70 @@ class AppointmentManager:
                 printer=printer
             )
             if printer:
-                print("CALENDAR RESPONSE ")
+                print("CALENDAR RESPONSE")
                 calendar_response.print()
+                print("STATUS = ", calendar_response.status)
 
             appointment.calendar_event_id = calendar_response.object
     
             if printer:
                 pprint(appointment.extract_booking_data())
 
-        try:
-            # Use the client.create method which includes built-in printing
-            # We don't need domain_check here because we did the check manually above.
-            # Pass printer=True to enable the printing from the client method.
-            appt_response = self.client.create(
-                model = APPOINTMENT.BOOKING_LINE,
-                vals = appointment.extract_booking_data(),
-                domain_check = ['event_start', 'event_stop'],
-                domain_comp = ['=', '='],
-                printer=printer
-                # domain_check and domain_comp are not needed due to manual check
-            )
+            if calendar_response.status == 'PASS':
 
-            # The client.create method returns the ID(s) on SUCCESS/PASS or False on FAIL.
-            # We just need to return its result.
-            return standarize_response(
-                request = appointment.extract_booking_data(),
-                response = appt_response
-            )
+                return standarize_response(
+                        request = appointment.extract_booking_data(),
+                        response = create_busy_response(calendar_response.object)
+                    )
 
-        except Exception as e:
-            # The client.create method should handle printing the error,
-            # but we can add an extra layer here if needed, or just return None.
-            # Let's rely on client.create's printer.
-            print(f"An unexpected error occurred during appointment creation: {e}")
-            return None, 400 # Indicate failure
+        if calendar_response.status == 'SUCCESS':
+            try:
+                # Use the client.create method which includes built-in printing
+                # We don't need domain_check here because we did the check manually above.
+                # Pass printer=True to enable the printing from the client method.
+                appt_response = self.client.create(
+                    model = APPOINTMENT.BOOKING_LINE,
+                    vals = appointment.extract_booking_data(),
+                    domains = (
+                            ['event_start', '>=', appointment.start_datetime],
+                            ['event_stop', '<=', appointment.end_datetime],
+                    ),
+                    printer=printer
+                    # domain_check and domain_comp are not needed due to manual check
+                )
+
+                if appt_response.status == 'PASS':
+                    return standarize_response(
+                        request = appointment.extract_booking_data(),
+                        response = create_busy_response(appt_response.object)
+                    )
+                
+                return standarize_response(
+                    request = appointment.extract_booking_data(),
+                    response = appt_response
+                )
+
+            except Exception as e:
+                # The client.create method should handle printing the error,
+                # but we can add an extra layer here if needed, or just return None.
+                # Let's rely on client.create's printer.
+                error_msg = f"An unexpected error occurred during appointment creation: {e}"
+                print(error_msg)
+                return standarize_response(
+                    request = appointment.extract_booking_data(),
+                    response = report_fail(
+                        action = 'create',
+                        model = APPOINTMENT.BOOKING_LINE,
+                        http_status = 400,
+                        msg = error_msg
+                    )
+                )
+        
+        return standarize_response(
+            request = appointment.extract_booking_data(),
+            response = calendar_response
+        )
+        
 
     # def find_appointments(
     #     self,

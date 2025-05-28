@@ -30,6 +30,14 @@ class Scheduler:
         if printer:
             pprint(event.data)
 
+        event_domains = [
+            ['start', '>=', event.data['start']],
+            ['stop', '<=', event.data['stop']]
+        ]
+        for field in ['partner_ids', 'resource_ids']:
+            if field in event.data:
+                event_domains.append([field, 'in', event.data[field]])
+
         try:
             # Probablemente sea requerido hacer una funcion especial para esto,
             # ya que luego podria entrar el tema del lugar o los partners. Pero como
@@ -38,8 +46,7 @@ class Scheduler:
             event_response = self.client.create(
                 model = CALENDAR.EVENT,
                 vals = event.data,
-                domain_check = ['start', 'stop'],
-                domain_comp = ['>=', '<='],
+                domains = event_domains,
                 printer=printer
             )
             event.odoo_id = event_response.object
