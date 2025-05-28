@@ -170,7 +170,6 @@ cython_debug/
 gcloud_template.cfg
 *.env
 test.env
-tests/
 tables_files/
 .DS_Store
 helpers.py
