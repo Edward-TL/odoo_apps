@@ -114,7 +114,8 @@ def report_fail(
         action: Action,
         model: str,
         http_status: HttpStatus,
-        msg: str) -> Response:
+        msg: str
+    ) -> Response:
     """
     Returns a Response error
     """

@@ -3,6 +3,7 @@ Library init file
 """
 from .calendar.scheduler import Scheduler
 from .calendar.objects import Alarm, Event
+from .contact.book import ContactBook
 from .stock.manager import StockManager
 from .appointment.manager import AppointmentManager
 from .utils.time_management import *
