@@ -108,14 +108,16 @@ class Response:
             "http_status": self.http_status,
             "msg": self.msg
         }
-    
+
 
 def report_fail(
         action: Action,
         model: str,
         http_status: HttpStatus,
         msg: str) -> Response:
-    
+    """
+    Returns a Response error
+    """
     return Response(
         action = action,
         model = model,
