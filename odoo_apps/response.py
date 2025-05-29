@@ -35,7 +35,7 @@ http_meaning = {
 
 HttpStatus = Literal[201, 200, 406, 409]
 StatusMeaning = Literal['SUCCESS', 'PASS', 'FAIL', 'CONFLICT']
-
+Action = Literal['read', 'search', 'create', 'update', 'delete']
 
 # Just an Idea, that will evolve
 Request = Union[
@@ -53,7 +53,7 @@ class Response:
     """
     Body for response data
     """
-    action: Literal['create', 'update', 'delete']
+    action: Action
     model: str
     object: int | list[int] | list[list[int, str]] | bool | None = None
     status: StatusMeaning = 'SUCCESS'
@@ -111,7 +111,7 @@ class Response:
     
 
 def report_fail(
-        action: Literal['create', 'update', 'delete'],
+        action: Action,
         model: str,
         http_status: HttpStatus,
         msg: str) -> Response:
