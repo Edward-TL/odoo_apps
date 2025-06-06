@@ -61,7 +61,8 @@ class Appointment:
             alarm_ids = self.alarm_id,
             description = self.description,
             location = self.location,
-            timezone_str = self.timezone_str
+            timezone_str = self.timezone_str,
+            odoo_id = self.calendar_event_id
         )
 
         self.event.add_appointment_data(

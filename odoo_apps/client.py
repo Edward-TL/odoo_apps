@@ -53,7 +53,7 @@ class OdooClient:
         self.uid = common.authenticate(self.db, self.username, self.password, {})
         self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
 
-    def search(self, model: str, domains: list[tuple[str,str,str]]):
+    def search(self, model: str, domains: list[tuple[str,str,str]]) -> list[int]:
         #request: SearchRequest):
         '''
         Search for records in the specified model that match the given domain.

@@ -2,10 +2,12 @@
 from dataclasses import dataclass, fields, field
 from datetime import datetime
 from pytz import timezone
+from typing import Optional
 
 from odoo_apps.type_hints.calendar import AlarmType, Frequency, Interval
 from odoo_apps.type_hints.media_relations import Privacy, ShowAs
 from odoo_apps.type_hints.time_zone import TimeZone
+from odoo_apps.utils.time_management import TIME_STR
 
 @dataclass
 class Alarm:
@@ -71,7 +73,7 @@ class Event:
     show_as: ShowAs = 'busy'  # Valores: 'busy', 'free'
     recurrency: bool = False
     interval: int = 1 # Days/Week/Month/Year Yeap, it's setted as intenger, I know...
-    # resource_ids: list[int] = DOCTOR_RESOURCE_ID
+    resource_ids: Optional[list[int]] = None
     rrule_type: Frequency = 'daily'
     count: int = 0  # Número de repeticiones (0 para indefinido si recurrencia es True)
     until: datetime = None  # Fecha límite de recurrencia
@@ -83,6 +85,10 @@ class Event:
 
         # Convertir las datetimes a UTC, que es la zona horaria que Odoo espera para el almacenamiento.
         # Asumimos que las datetimes proporcionadas ya están en la timezone_str especificada.
+        if isinstance(self.start_datetime, str):
+            self.start_datetime = datetime.strptime(self.start_datetime, TIME_STR)
+            self.end_datetime = datetime.strptime(self.end_datetime, TIME_STR)
+
         start_naive = self.start_datetime.replace(tzinfo=None)
         # print("start_naive: ", start_naive)
         end_naive = self.end_datetime.replace(tzinfo=None)
@@ -117,6 +123,12 @@ class Event:
         'allday': self.is_all_day,  # Por defecto, los self.s tienen una hora específica
         'event_tz': self.timezone_str, # Almacenar la zona horaria para la visualización
         }
+
+        if self.resource_ids is not None:
+            self.data['appointment_resource_ids'] = self.resource_ids
+
+        if self.odoo_id is not None:
+            self.data['calendar_event_id'] = self.odoo_id
 
     def add_appointment_data(
         self, appt_type_id, partner_ids, based_on='resources'

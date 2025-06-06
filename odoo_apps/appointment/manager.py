@@ -3,7 +3,9 @@ apps/appointment/appt_manager.py
 Appointment Manager file
 """
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pprint import pprint
+from typing import Literal
 
 from flask import Response as FlaskResponse
 
@@ -12,17 +14,21 @@ from odoo_apps.models import APPOINTMENT, CALENDAR
 from odoo_apps.response import Response, standarize_response, report_fail
 
 from odoo_apps.calendar.scheduler import Scheduler
+# from odoo_apps.calendar.objects import Event
+
+from odoo_apps.utils.time_management import (
+    adapt_datetime,
+    extract_hour,
+    TIME_STR
+    )
+
+from .helpers import (
+    create_bad_request_response,
+    create_busy_response,
+    create_error_response
+)
 from .objects import Appointment
 
-def create_busy_response(object_id) -> Response:
-    return Response(
-        action = 'create',
-        model = CALENDAR.EVENT,
-        object = object_id,
-        status = 'PASS',
-        http_status = 409,
-        msg = "User is busy. Request is OK. Try other time"
-    )
 
 @dataclass
 class AppointmentManager:
@@ -53,6 +59,43 @@ class AppointmentManager:
             domain = [('appointment_type_ids','=', appointment_type_id)],
             fields = ['book_url']
         )[0]['book_url']
+    
+    def check_slots_available(
+            self,
+            appointment_type_id: int,
+            weekday: int,
+            start_hour: int,
+            end_hour: int
+            ) -> list[int]:
+        """
+        Check if there's a worktime slot available for the given time
+        range. This does not mean that there's a free space on calendar or
+        appointments booking line.
+        Args:
+            - appointment_type_id: int value of the appointment_type required
+            - weekday: int value of weekday. Monday is 1.
+            - start_hour: INT value
+            - end_hour: INT value
+        
+        Validation:
+        domains = [
+                ['appointment_type_id', '=', appointment_type_id],
+                ['weekday', '=', weekday],
+                ['start_hour', '<=', start_hour],
+                ['end_hour', '>=', end_hour]
+            ]
+        Returns:
+            A list of slots ids that matches with the given data.
+        """
+        return self.client.search(
+            APPOINTMENT.SLOT,
+            domains = [
+                ['appointment_type_id', '=', appointment_type_id],
+                ['weekday', '=', weekday],
+                ['start_hour', '<=', start_hour],
+                ['end_hour', '>=', end_hour]
+            ]
+        )
 
     def extract_appointment_data(self, request: dict) -> Appointment:
         """
@@ -101,6 +144,10 @@ class AppointmentManager:
             partner_ids = request['partner_ids']
         )
 
+        if 'calendar_event_id' in request:
+            appointment.calendar_event_id = request['calendar_event_id']
+            appointment.event.odoo_id = request['calendar_event_id']
+            appointment.event.data['calendar_event_id'] = request['calendar_event_id']
 
         return appointment
 
@@ -193,8 +240,121 @@ class AppointmentManager:
             request = appointment.extract_booking_data(),
             response = calendar_response
         )
-        
+    
 
+    def reschedule(self, request: dict, printer = False, timeoffset = '-0600') -> FlaskResponse:
+        """
+        Reschedules an existing calendar event after performing validation and conflict checks.
+        
+        Request Args:
+            - appointment_type_id: Int value that represents the type of appointment
+            - client_id: Int value of the clients refference.
+            - calendar_event_id: Int value of the event that wants to be
+            - name: Optional[String] value with that specify that is an Reschedule
+            - start: Datetime STRING value with the format `%Y-%m-%d %H:%M %z` of the
+                tentative new datetime start schedule. 
+            - stop: Datetime STRING value with the format `%Y-%m-%d %H:%M %z` of the
+                tentative new datetime stop schedule.
+
+        Returns:
+            - response: FlaskResponse, where the response['response'] object contains the data
+                of action succes. Remember that does can be (but not exclusively):
+
+                SUCCESS, FAIL, PASS, BAD REQUEST, NOT ACEPTABLE, CONFLICT
+
+                From odoo_apps.response check `meaning` and `http_meaning` for more context.
+        """
+
+        # "One" is added because in Odoo Monday is 1, and in .weekday() it's 0
+        slot_weekday = datetime.strptime(request['start'], TIME_STR).weekday() + 1
+        
+        slots = self.check_slots_available(
+            appointment_type_id = request['appointment_type_id'],
+            weekday = slot_weekday,
+            start_hour = extract_hour(request['start']),
+            end_hour = extract_hour(request['stop'])
+        )
+
+        if slots in ([], [None]):
+            return standarize_response(
+                request = request,
+                response = Response(
+                    action = 'update',
+                    model = CALENDAR.EVENT,
+                    object = request['calendar_event_id'],
+                    status = 'CONFLICT',
+                    http_status = 409,
+                    msg = 'There is not Slot available. Try another space.'
+                )
+            )
+        
+        
+        try:
+            
+            return self.scheduler.move_calendar_event(
+                event_id = request['calendar_event_id'],
+                new_start = adapt_datetime(request['start'], timeoffset),
+                new_stop = adapt_datetime(request['stop'], timeoffset),
+                update_name = request['name'],
+                printer=printer
+            )
+        
+        except Exception as e:
+            exception_msg = f"Error al actualizar la cita del calendario '{request['name']}': {e}"
+            print(exception_msg)
+            return create_error_response(
+                msg = exception_msg,
+                action = 'cancel'
+            )
+
+    def cancel(self, request: dict, printer = FlaskResponse) -> FlaskResponse:
+        """
+        Cancels (deletes) a calendar event based on its ID.
+
+        This method attempts to delete a calendar event identified by
+        `calendar_event_id` via `odoo.client`. It first validates the presence of
+        `calendar_event_id` in the event data and checks if the event actually exists
+        before attempting deletion.
+        Optional debug information can be printed during the process.
+
+        Args:
+            event (Event): The event object containing details for cancellation.
+                Expected to have an attribute `data` (dict) which must contain
+                `'calendar_event_id'`. The `event` object should also have
+                `name` and `odoo_id` attributes, which are used for logging
+                messages if printing is enabled.
+            printer (callable or truthy, optional): A flag or callable to enable
+                diagnostic printing. If truthy (defaults to the `FlaskResponse`
+                class, which is truthy), debug messages are printed to standard
+                output. To disable printing, pass a falsy value like `None`.
+
+        Returns:
+            FlaskResponse: An object suitable for an HTTP response in a Flask application.
+                - If `calendar_event_id` is missing or the event does not exist,
+                it returns a "bad request" response generated by
+                `create_bad_request_response`.
+                - If the deletion is successful, it returns the response from
+                `self.client.delete`.
+                - If an error occurs during deletion, it returns an error
+                response generated by `create_error_response`.
+        """
+        if printer:
+            print('Checking if `calendar_event_id` was given')
+        
+        if 'calendar_event_id' not in request:
+            return create_bad_request_response(
+                msg = f'Missing `calendar_event_id` on request. Keys given: {request.keys()}',
+                action = 'cancel'
+            )
+
+        # self.client.update_single_record(
+        #     model=APPOINTMENT.APPOINTMENT,
+        #     record_id=appointment_id,
+        #     new_val={'state': 'cancel'},
+        #     printer=True
+        # )
+
+        return self.scheduler.cancel(request['calendar_event_id'])
     # def find_appointments(
     #     self,
     #     domain: List[tuple[str, str, any]] = None,

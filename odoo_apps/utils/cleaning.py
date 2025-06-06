@@ -102,3 +102,8 @@ def check_domains(
         return gen_domains_from_list(domain_fields, domain_operators, vals)
 
     return ([],[],[])
+
+def replace_values(old_val, new_val, array: list) -> None:
+    if old_val in array:
+        name_idx = array.index(old_val)
+        array[name_idx] = new_val

@@ -33,8 +33,8 @@ http_meaning = {
     409: 'CONFLICT'
 }
 
-HttpStatus = Literal[201, 200, 406, 409]
-StatusMeaning = Literal['SUCCESS', 'PASS', 'FAIL', 'CONFLICT']
+HttpStatus = Literal[201, 200, 406, 409, 400]
+StatusMeaning = Literal['SUCCESS', 'PASS', 'FAIL', 'CONFLICT', 'BAD REQUEST']
 Action = Literal['read', 'search', 'create', 'update', 'delete']
 
 # Just an Idea, that will evolve
@@ -139,8 +139,10 @@ def standarize_response(request: Request, response: Response) -> FlaskResponse:
         "message": response.msg,
         "success": response_status in {200, 201},
         "status": response_status, 
-        "request": request.data if not isinstance(request, dict) else request,
-        "response": response.get_data()
+        "body": response.get_data(),
+        "metadata": {
+            "requested": request.data if not isinstance(request, dict) else request,
+            }
     }
 
     # print(type(data['request']))

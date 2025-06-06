@@ -2,11 +2,48 @@
 """
 
 from dataclasses import dataclass
+from typing import Literal, Optional
 from pprint import pprint
 
 from odoo_apps.client import OdooClient
 from odoo_apps.models import CALENDAR
+from odoo_apps.response import Response
+from flask import Response as FlaskResponse
 from .objects import Event
+
+def create_busy_response(object_id) -> Response:
+    return Response(
+        action = 'create',
+        model = CALENDAR.EVENT,
+        object = object_id,
+        status = 'PASS',
+        http_status = 409,
+        msg = "User is busy. Request is OK. Try other time"
+    )
+
+def create_bad_request_response(
+        msg: str, action: Literal['update', 'cancel', 'create'] = 'update'
+        ) -> Response:
+    return Response(
+        action = action,
+        model = CALENDAR.EVENT,
+        object = None,
+        status = 'BAD REQUEST',
+        http_status = 400,
+        msg = msg
+    )
+
+def create_error_response(
+    msg: str, action: Literal['update', 'cancel', 'create'] = 'update'
+    ) -> Response:
+    return Response(
+        action = action,
+        model = CALENDAR.EVENT,
+        object = None,
+        status = 'NOT ACCEPTABLE',
+        http_status = 406,
+        msg = msg
+    )
 
 
 @dataclass
@@ -18,7 +55,7 @@ class Scheduler:
 
  # Para manejar zonas horarias
 
-    def create_calendar_event(self, event: Event, printer=False):
+    def create_calendar_event(self, event: Event, printer=False) -> FlaskResponse:
         """
         Crea un nuevo evento en el calendario de Odoo utilizando RPC.
         Args:
@@ -29,11 +66,11 @@ class Scheduler:
         """
         if printer:
             pprint(event.data)
-
         event_domains = [
             ['start', '>=', event.data['start']],
             ['stop', '<=', event.data['stop']]
         ]
+
         for field in ['partner_ids', 'resource_ids']:
             if field in event.data:
                 event_domains.append([field, 'in', event.data[field]])
@@ -56,7 +93,94 @@ class Scheduler:
             return event_response
 
         except Exception as e:
-            print(f"Error al crear el event de calendario '{event.name}': {e}")
-            return False
+            exception_msg = f"Error al crear el event de calendario '{event.name}': {e}"
+            print(exception_msg)
+            return create_error_response(
+                msg = exception_msg
+            )
+    
+    def move_calendar_event(
+            self,
+            event_id: int|list[int],
+            new_start: str,
+            new_stop: str,
+            update_name: Optional[str] = None,
+        printer = False) -> FlaskResponse:
+        """
+        Moves an event on time. All validations must be done before.
+        Args:
+            - event_id: Odoo's event id at `calendar.event`
+            - start: Datetime str with timezone.
+            - stop: Datetime str with timezone.
+        """
+        reschedule_vals = {
+            'start': new_start,
+            'stop': new_stop
+        }
+        if update_name:
+            reschedule_vals['name'] = update_name
+        try:
+            update_response = self.client.update(
+                model = CALENDAR.EVENT,
+                records_ids= event_id,
+                new_vals = reschedule_vals,
+                printer=printer
+            )
 
-   
+            if printer:
+                print(f"Evento de calendario '{update_name}' ACTUALIZADO con ID: {event_id}")
+            return update_response
+
+        except Exception as e:
+            exception_msg = f"Error al actualizar el event de calendario ID `{event_id}`: {e}"
+            print(exception_msg)
+            return create_error_response(
+                msg = exception_msg
+            )
+        
+    def cancel(self, event_id: int | list[int], printer = False) -> FlaskResponse:
+        """
+        If exists, delets an given Event by it's ID.
+        Args:
+            - event_id: int | list[int]. If int, turns it into a list[int]. Must be an
+                existing event's ID
+
+        Returns:
+            Standarize Response with the given Request and Result 
+        """
+        if printer:
+            print('Checking if event exists')
+
+        if isinstance(event_id, int):
+            event_id = [event_id]
+
+        event_exists = self.client.search(
+            model = CALENDAR.EVENT,
+            domains = [
+                ['id', '=', event_id]
+            ]
+        )
+        
+        if event_exists in ([], [None]): # Event DOES NOT exist
+            return create_bad_request_response(
+                msg = 'Missing `calendar_event_id` HAS NEVER BEEN SCHEDULED.',
+                action = 'cancel'
+            )
+
+        try:
+            delete_response = self.client.delete(
+                model = CALENDAR.EVENT,
+                ids = event_id
+            )
+
+            if printer:
+                print(f"Evento de calendario con ID: {event_id} ELIMINADO")
+            return delete_response
+
+        except Exception as e:
+            exception_msg = f"Error al eliminar el event de calendario '{event_id}': {e}"
+            print(exception_msg)
+            return create_error_response(
+                msg = exception_msg,
+                action = 'cancel'
+            )
