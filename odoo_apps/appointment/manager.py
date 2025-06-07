@@ -22,7 +22,7 @@ from odoo_apps.utils.time_management import (
     TIME_STR
     )
 
-from .helpers import (
+from .checkers import (
     create_bad_request_response,
     create_busy_response,
     create_error_response

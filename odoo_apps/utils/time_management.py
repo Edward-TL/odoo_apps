@@ -22,7 +22,8 @@ def standarize_datetime(
     Returns:
         datetime: The UTC datetime as a string in the format 'YYYY-MM-DD HH:MM:SS'.
     """
-    
+
+
     if isinstance(dt, str):
         return adapt_datetime(dt, timeoffset)
 
