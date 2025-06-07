@@ -307,7 +307,7 @@ class AppointmentManager:
                 action = 'cancel'
             )
 
-    def cancel(self, request: dict, printer = FlaskResponse) -> FlaskResponse:
+    def cancel(self, request_body: dict, printer = FlaskResponse) -> FlaskResponse:
         """
         Cancels (deletes) a calendar event based on its ID.
 
@@ -318,15 +318,10 @@ class AppointmentManager:
         Optional debug information can be printed during the process.
 
         Args:
-            event (Event): The event object containing details for cancellation.
-                Expected to have an attribute `data` (dict) which must contain
-                `'calendar_event_id'`. The `event` object should also have
-                `name` and `odoo_id` attributes, which are used for logging
-                messages if printing is enabled.
-            printer (callable or truthy, optional): A flag or callable to enable
-                diagnostic printing. If truthy (defaults to the `FlaskResponse`
-                class, which is truthy), debug messages are printed to standard
-                output. To disable printing, pass a falsy value like `None`.
+            calendar_event_id: The Int value of calendar event in odoo db, that is.
+                attempt to be deleted. It only requires calendar_event_id because, it's the
+                real reference of the appointment. Once is deleted from calendar, the appointment
+                it's deleted from appointments.booking_line
 
         Returns:
             FlaskResponse: An object suitable for an HTTP response in a Flask application.
@@ -341,9 +336,9 @@ class AppointmentManager:
         if printer:
             print('Checking if `calendar_event_id` was given')
         
-        if 'calendar_event_id' not in request:
+        if 'calendar_event_id' not in request_body:
             return create_bad_request_response(
-                msg = f'Missing `calendar_event_id` on request. Keys given: {request.keys()}',
+                msg = f'Missing `calendar_event_id` on request. Keys given: {request_body.keys()}',
                 action = 'cancel'
             )
 
@@ -354,7 +349,7 @@ class AppointmentManager:
         #     printer=True
         # )
 
-        return self.scheduler.cancel(request['calendar_event_id'])
+        return self.scheduler.cancel(request_body['calendar_event_id'])
     # def find_appointments(
     #     self,
     #     domain: List[tuple[str, str, any]] = None,
