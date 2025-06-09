@@ -246,12 +246,13 @@ class OdooClient:
                 model, "write",
                 [records_ids, new_vals]
             )
-            response.complete_response(
-                    obj_id = object_vals,
-                    status = 201,
-                    printer = printer
-                )
-            return response
+            if object_vals:
+                response.complete_response(
+                        obj_id = records_ids,
+                        status = 201,
+                        printer = printer
+                    )
+                return response
 
         except Exception as e:
             response.complete_response(

@@ -65,12 +65,15 @@ class Scheduler:
                         False si ocurrió un error.
         """
         if printer:
+            print('calendar event creation')
             pprint(event.data)
         event_domains = [
             ['start', '>=', event.data['start']],
             ['stop', '<=', event.data['stop']]
         ]
 
+        # Esto igual y se puede revisar con alguna comparacion de los documentos y logica
+        # a la o hardcodeada, despues de la consulta.
         for field in ['partner_ids', 'resource_ids']:
             if field in event.data:
                 event_domains.append([field, 'in', event.data[field]])

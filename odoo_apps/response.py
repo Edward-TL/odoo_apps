@@ -150,11 +150,6 @@ def standarize_response(request: Request, response: Response) -> FlaskResponse:
     # print(data)
     with app.app_context():
         response = make_response(
-            jsonify(
-                data
-            ),
-            response.status
+            data, response_status
         )
-        response.headers['Content-Type'] = 'application/json'
-
         return response

@@ -7,7 +7,7 @@ from typing import Optional
 from odoo_apps.type_hints.calendar import AlarmType, Frequency, Interval
 from odoo_apps.type_hints.media_relations import Privacy, ShowAs
 from odoo_apps.type_hints.time_zone import TimeZone
-from odoo_apps.utils.time_management import TIME_STR
+from odoo_apps.utils.time_management import TIME_STR, standarize_datetime
 
 @dataclass
 class Alarm:
@@ -63,9 +63,10 @@ class Event:
         timezone_str (str, optional): Zona horaria del evento. Por defecto es 'UTC'.
     """
     name: str
-    start_datetime: datetime
-    end_datetime: datetime
-    partner_ids: list[str] | list[int] | None = field(default_factory=[3])
+    start_datetime: datetime | str
+    end_datetime: datetime | str
+    standarized_datetime: bool
+    partner_ids: list[str] | list[int]
     alarm_ids: list[Alarm] | list[str] | list[int] | None = BASIC_ALARM
     description: str = "Espacio agendado"
     location: str = ""
@@ -85,29 +86,24 @@ class Event:
 
         # Convertir las datetimes a UTC, que es la zona horaria que Odoo espera para el almacenamiento.
         # Asumimos que las datetimes proporcionadas ya están en la timezone_str especificada.
-        if isinstance(self.start_datetime, str):
-            self.start_datetime = datetime.strptime(self.start_datetime, TIME_STR)
-            self.end_datetime = datetime.strptime(self.end_datetime, TIME_STR)
-
-        start_naive = self.start_datetime.replace(tzinfo=None)
-        # print("start_naive: ", start_naive)
-        end_naive = self.end_datetime.replace(tzinfo=None)
-        # print("end_naive: ", end_naive)
-
-        self.start_utc = start_naive.astimezone(timezone(self.timezone_str))
-        # print("start_utc: ", self.start_utc)
-        self.end_utc = end_naive.astimezone(timezone(self.timezone_str))
-        # print("end_utc: ", self.end_utc)
-
-        diferencia = abs(self.end_datetime - self.start_datetime)
-        diferencia_en_horas = diferencia.total_seconds() / 3600
-
-        self.is_all_day = bool(diferencia_en_horas % 24 == 0)
+        if self.standarized_datetime is False:
+            self.start_utc = standarize_datetime(
+                self.start_datetime,
+                tz_str = self.timezone_str
+                )
+            self.start_utc = standarize_datetime(
+                self.start_datetime,
+                tz_str = self.timezone_str
+                )
+            
+        else:
+            self.start_utc = self.start_datetime
+            self.end_utc = self.end_datetime
 
         self.data = {
         'name': self.name,
-        'start': self.start_utc.strftime('%Y-%m-%d %H:%M:%S'),
-        'stop': self.end_utc.strftime('%Y-%m-%d %H:%M:%S'),
+        'start': self.start_utc,
+        'stop': self.end_utc,
         'partner_ids': [self.partner_ids],
         'alarm_ids': self.alarm_ids,
         'description': self.description,
@@ -120,7 +116,7 @@ class Event:
         'rrule_type': self.rrule_type,
         'count': self.count if self.recurrency else False,
         # 'until': until.astimezone(timezone('UTC')).strftime('%Y-%m-%d') if recurrency and until else False,
-        'allday': self.is_all_day,  # Por defecto, los self.s tienen una hora específica
+        'allday': False,  # Por defecto, los self.s tienen una hora específica
         'event_tz': self.timezone_str, # Almacenar la zona horaria para la visualización
         }
 

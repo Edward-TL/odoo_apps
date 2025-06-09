@@ -1,6 +1,6 @@
 """
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from odoo_apps.utils.time_management import standarize_datetime
@@ -29,11 +29,12 @@ class Appointment:
         * odoo_id (int, optional): The ID of the appointment in Odoo (assigned after creation).
             Defaults to None.
     """
-    start_datetime: datetime
-    end_datetime: datetime
+    start_request: datetime | str
+    end_request: datetime | str
     resource_ids: int
-    type_id: int
     partner_ids: int | list[int]
+    type_id: int = 1
+    datetime_is_standarized: bool = False
     name: str = 'Consulta' # Odoo often generates the name
     location: str = "Consultorio Privado 101"
     description: str = "Consulta de prueba"
@@ -50,19 +51,28 @@ class Appointment:
         Converts datetimes to UTC strings and prepares the data dictionary.
         """
         # Format for Odoo RPC
-        self.start_utc_str = standarize_datetime(self.start_datetime, self.timezone_str)
-        self.end_utc_str = standarize_datetime(self.end_datetime, self.timezone_str)
+        if self.datetime_is_standarized is False:
+            self.start_utc_str = standarize_datetime(self.start_request, self.timezone_str)
+            self.end_utc_str = standarize_datetime(self.end_request, self.timezone_str)
+            self.datetime_is_standarized = True
+        
+        else:
+            self.start_utc_str = self.start_request
+            self.end_utc_str = self.end_request
 
+        print(self.start_utc_str)
+        print(self.end_utc_str)
         self.event = Event(
             name = self.name,
-            start_datetime = self.start_datetime,
-            end_datetime = self.end_datetime,
+            start_datetime = self.start_utc_str,
+            end_datetime = self.end_utc_str,
             partner_ids = self.partner_ids,
             alarm_ids = self.alarm_id,
             description = self.description,
             location = self.location,
             timezone_str = self.timezone_str,
-            odoo_id = self.calendar_event_id
+            odoo_id = self.calendar_event_id,
+            standarized_datetime = True
         )
 
         self.event.add_appointment_data(
@@ -80,6 +90,22 @@ class Appointment:
             'calendar_event_id': self.calendar_event_id,
             'event_start': self.start_utc_str, # Odoo uses 'start' and 'stop' for datetimes
             'event_stop': self.end_utc_str,
+            'display_name': self.event.name,
+            # DOES NOT EXIST ON MODEL. DON'T ADD IT
+            # 'partner_ids': self.partner_ids
+            # 'create_uid': self.partner_id
+        }
+    
+    def requested_data(self):
+        return {
+            # 'active': True,
+            'appointment_resource_id': self.resource_ids,
+            'appointment_type_id': self.type_id,
+            'capacity_reserved': self.capacity_reserved,
+            'capacity_used': self.capacity_used,
+            'calendar_event_id': self.calendar_event_id,
+            'event_start': self.start_request, # Odoo uses 'start' and 'stop' for datetimes
+            'event_stop': self.end_request,
             'display_name': self.event.name,
             # DOES NOT EXIST ON MODEL. DON'T ADD IT
             # 'partner_ids': self.partner_ids

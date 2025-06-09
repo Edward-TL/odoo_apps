@@ -3,9 +3,8 @@ apps/appointment/appt_manager.py
 Appointment Manager file
 """
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pprint import pprint
-from typing import Literal
 
 from flask import Response as FlaskResponse
 
@@ -17,7 +16,6 @@ from odoo_apps.calendar.scheduler import Scheduler
 # from odoo_apps.calendar.objects import Event
 
 from odoo_apps.utils.time_management import (
-    adapt_datetime,
     extract_hour,
     TIME_STR
     )
@@ -37,8 +35,8 @@ class AppointmentManager:
     """
     client: OdooClient
     request_fields = tuple([
-        'event_start',
-        'event_stop',
+        'start',
+        'stop',
         'name',
         'appointment_resource_id',
         'appointment_type_id',
@@ -96,6 +94,19 @@ class AppointmentManager:
                 ['end_hour', '>=', end_hour]
             ]
         )
+    
+    def weekday_slots(
+            self,
+            appointment_type_id: int,
+            weekday: int) -> dict:
+        return self.client.search_read(
+            APPOINTMENT.SLOT,
+            domain = [
+                ['appointment_type_id', '=', appointment_type_id],
+                ['weekday', '=', weekday]
+            ],
+            fields = ['start_hour', 'end_hour']
+        )
 
     def extract_appointment_data(self, request: dict) -> Appointment:
         """
@@ -110,7 +121,7 @@ class AppointmentManager:
         # Assuming request contains all necessary fields for Appointment
 
 
-        if request['appointment_type_id'] is None and request['name_type'] is not None:
+        if request['appointment_type_id'] is None and request['name_type'] is None:
 
             return standarize_response(
                 request = request,
@@ -135,8 +146,8 @@ class AppointmentManager:
                 request['appointment_type_id'] = existing_ids[0]
 
         appointment = Appointment(
-            start_datetime = request['event_start'],
-            end_datetime = request['event_stop'],
+            start_request = request['start'],
+            end_request = request['stop'],
             name = request['name'],
             resource_ids = request['appointment_resource_id'],
             type_id = request['appointment_type_id'],
@@ -165,12 +176,40 @@ class AppointmentManager:
         """
         if printer:
             pprint(appointment.extract_booking_data())
+        # REVISAR LOS SLOTS
+        slot_weekday = datetime.strptime(appointment.start_utc_str, TIME_STR).weekday() + 1
+        slots = self.check_slots_available(
+            appointment_type_id = appointment.type_id,
+            weekday = slot_weekday,
+            start_hour = extract_hour(appointment.start_utc_str),
+            end_hour = extract_hour(appointment.end_utc_str)
+        )
+
+        if slots in ([], [None]):
+            # slot_ranges = self.weekday_slots(
+            #     appointment_type_id = appointment.type_id,
+            #     weekday = slot_weekday
+            # )
+
+            # if len(slot_ranges) > 1:
+            #     first_slot = slot_ranges[0]['s']
+            return standarize_response(
+                request = appointment.requested_data(),
+                response = Response(
+                    action = 'update',
+                    model = CALENDAR.EVENT,
+                    object = appointment.event.odoo_id,
+                    status = 'CONFLICT',
+                    http_status = 409,
+                    msg = 'There is not Slot available. Try another space.'
+                )
+            )
 
         if appointment.calendar_event_id is None:
 
             if printer:
                 print('appointment.event.data')
-                print(appointment.event.data)
+                pprint(appointment.event.data)
 
             calendar_response = self.scheduler.create_calendar_event(
                 event = appointment.event,
@@ -189,7 +228,7 @@ class AppointmentManager:
             if calendar_response.status == 'PASS':
 
                 return standarize_response(
-                        request = appointment.extract_booking_data(),
+                        request = appointment.requested_data(),
                         response = create_busy_response(calendar_response.object)
                     )
 
@@ -200,10 +239,10 @@ class AppointmentManager:
                 # Pass printer=True to enable the printing from the client method.
                 appt_response = self.client.create(
                     model = APPOINTMENT.BOOKING_LINE,
-                    vals = appointment.extract_booking_data(),
+                    vals = appointment.requested_data(),
                     domains = (
-                            ['event_start', '>=', appointment.start_datetime],
-                            ['event_stop', '<=', appointment.end_datetime],
+                            ['event_start', '>=', appointment.start_request],
+                            ['event_stop', '<=', appointment.end_request],
                     ),
                     printer=printer
                     # domain_check and domain_comp are not needed due to manual check
@@ -211,12 +250,12 @@ class AppointmentManager:
 
                 if appt_response.status == 'PASS':
                     return standarize_response(
-                        request = appointment.extract_booking_data(),
+                        request = appointment.requested_data(),
                         response = create_busy_response(appt_response.object)
                     )
                 
                 return standarize_response(
-                    request = appointment.extract_booking_data(),
+                    request = appointment.requested_data(),
                     response = appt_response
                 )
 
@@ -227,7 +266,7 @@ class AppointmentManager:
                 error_msg = f"An unexpected error occurred during appointment creation: {e}"
                 print(error_msg)
                 return standarize_response(
-                    request = appointment.extract_booking_data(),
+                    request = appointment.requested_data(),
                     response = report_fail(
                         action = 'create',
                         model = APPOINTMENT.BOOKING_LINE,
@@ -237,12 +276,12 @@ class AppointmentManager:
                 )
         
         return standarize_response(
-            request = appointment.extract_booking_data(),
+            request = appointment.requested_data(),
             response = calendar_response
         )
     
 
-    def reschedule(self, request: dict, printer = False, timeoffset = '-0600') -> FlaskResponse:
+    def reschedule(self, appointment: Appointment, printer = False, timeoffset = '-0600') -> FlaskResponse:
         """
         Reschedules an existing calendar event after performing validation and conflict checks.
         
@@ -266,41 +305,60 @@ class AppointmentManager:
         """
 
         # "One" is added because in Odoo Monday is 1, and in .weekday() it's 0
-        slot_weekday = datetime.strptime(request['start'], TIME_STR).weekday() + 1
-        
+        slot_weekday = datetime.strptime(appointment.start_utc_str, TIME_STR).weekday() + 1
         slots = self.check_slots_available(
-            appointment_type_id = request['appointment_type_id'],
+            appointment_type_id = appointment.type_id,
             weekday = slot_weekday,
-            start_hour = extract_hour(request['start']),
-            end_hour = extract_hour(request['stop'])
+            start_hour = extract_hour(appointment.start_utc_str),
+            end_hour = extract_hour(appointment.end_utc_str)
         )
 
         if slots in ([], [None]):
             return standarize_response(
-                request = request,
+                request = appointment.requested_data(),
                 response = Response(
                     action = 'update',
-                    model = CALENDAR.EVENT,
-                    object = request['calendar_event_id'],
+                    model = APPOINTMENT.BOOKING_LINE,
+                    object = appointment.event.odoo_id,
                     status = 'CONFLICT',
                     http_status = 409,
                     msg = 'There is not Slot available. Try another space.'
                 )
             )
         
-        
+        can_modify = self.client.search(
+            model = CALENDAR.EVENT,
+            domains = [
+                ['id', '=', appointment.calendar_event_id],
+                ['partner_ids', '=', appointment.partner_ids]
+            ]
+        )
+        if not can_modify:
+            return standarize_response(
+                request = appointment.requested_data(),
+                response = Response(
+                    action = 'update',
+                    model = CALENDAR.EVENT,
+                    object = appointment.event.odoo_id,
+                    status = 'CONFLICT',
+                    http_status = 409,
+                    msg = 'There is no calendar_event with this partner.'
+                )
+            )
         try:
-            
-            return self.scheduler.move_calendar_event(
-                event_id = request['calendar_event_id'],
-                new_start = adapt_datetime(request['start'], timeoffset),
-                new_stop = adapt_datetime(request['stop'], timeoffset),
-                update_name = request['name'],
-                printer=printer
+            return standarize_response(
+                request = appointment.requested_data(),
+                response = self.scheduler.move_calendar_event(
+                    event_id = appointment.calendar_event_id,
+                    new_start = appointment.start_utc_str,
+                    new_stop = appointment.end_utc_str,
+                    update_name = appointment.name,
+                    printer=printer
+                )
             )
         
         except Exception as e:
-            exception_msg = f"Error al actualizar la cita del calendario '{request['name']}': {e}"
+            exception_msg = f"Error al actualizar la cita del calendario '{appointment.name}': {e}"
             print(exception_msg)
             return create_error_response(
                 msg = exception_msg,
@@ -335,12 +393,39 @@ class AppointmentManager:
         """
         if printer:
             print('Checking if `calendar_event_id` was given')
-        
+
         if 'calendar_event_id' not in request_body:
             return create_bad_request_response(
                 msg = f'Missing `calendar_event_id` on request. Keys given: {request_body.keys()}',
                 action = 'cancel'
             )
+        
+        if 'partner_ids' not in request_body:
+            return create_bad_request_response(
+                msg = f'Missing `calendar_event_id` on request. Keys given: {request_body.keys()}',
+                action = 'cancel'
+            )
+        
+        can_cancel = self.client.search(
+            model = CALENDAR.EVENT,
+            domains = [
+                ['id', '=', request_body['calendar_event_id']],
+                ['partner_ids', '=', request_body['partner_ids']]
+            ]
+        )
+        if not can_cancel:
+            return standarize_response(
+                request = request_body,
+                response = Response(
+                    action = 'update',
+                    model = CALENDAR.EVENT,
+                    object = request_body['calendar_event_id'],
+                    status = 'CONFLICT',
+                    http_status = 409,
+                    msg = 'There is no calendar_event with this partner.'
+                )
+            )
+        
 
         # self.client.update_single_record(
         #     model=APPOINTMENT.APPOINTMENT,
@@ -348,8 +433,22 @@ class AppointmentManager:
         #     new_val={'state': 'cancel'},
         #     printer=True
         # )
-
-        return self.scheduler.cancel(request_body['calendar_event_id'])
+        try:
+            return standarize_response(
+                request = request_body,
+                response = self.scheduler.cancel(
+                    request_body['calendar_event_id']
+                    )
+            )
+        
+        except Exception as e:
+            ceid = request_body['calendar_event_id']
+            exception_msg = f"Error al cancelar la cita del calendario '{ceid}': {e}"
+            print(exception_msg)
+            return create_error_response(
+                msg = exception_msg,
+                action = 'cancel'
+            )
     # def find_appointments(
     #     self,
     #     domain: List[tuple[str, str, any]] = None,
