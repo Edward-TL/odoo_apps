@@ -20,6 +20,7 @@ ReferenceField = Literal[
 ]
 
 JSON_FIELDS_REF = {
+    "json_var": "odoo_var",
     "clients_phones": 'phone',
     "client_name": 'name',
     "contact_email": 'email',
@@ -34,7 +35,7 @@ class ContactBook:
     create or edit it.
     """
     client: OdooClient
-    # fields_ref: dict = field(default_factory=JSON_FIELDS_REF)
+    json_fields_ref: dict = field(default_factory = lambda: JSON_FIELDS_REF)
 
     def get_contact_id(
         self, by: ReferenceField, reference: str, operator: Operator = '='
@@ -48,11 +49,7 @@ class ContactBook:
                 [by, operator, reference]
             ]
         )[0]['id']
-    
-    def fields_ref(self) -> dict:
-        return JSON_FIELDS_REF
-    
-    
+
     def check_register_contacts(self, references: list[str], by_field:ReferenceField = 'phone') -> list:
         """Validates contact registration, primarily focusing on the first contact.
 
