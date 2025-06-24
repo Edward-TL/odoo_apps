@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 from pprint import pprint
 
+from flask import Response as FlaskResponse
+
 from odoo_apps.client import OdooClient
 from odoo_apps.models import CALENDAR
 from odoo_apps.response import Response
-from flask import Response as FlaskResponse
 from .objects import Event
 
 def create_busy_response(object_id) -> Response:
@@ -17,7 +18,7 @@ def create_busy_response(object_id) -> Response:
         model = CALENDAR.EVENT,
         object = object_id,
         status = 'PASS',
-        http_status = 409,
+        status_code = 409,
         msg = "User is busy. Request is OK. Try other time"
     )
 
@@ -29,7 +30,7 @@ def create_bad_request_response(
         model = CALENDAR.EVENT,
         object = None,
         status = 'BAD REQUEST',
-        http_status = 400,
+        status_code = 400,
         msg = msg
     )
 
@@ -41,7 +42,7 @@ def create_error_response(
         model = CALENDAR.EVENT,
         object = None,
         status = 'NOT ACCEPTABLE',
-        http_status = 406,
+        status_code = 406,
         msg = msg
     )
 
@@ -54,6 +55,21 @@ class Scheduler:
     client: OdooClient
 
  # Para manejar zonas horarias
+    def search_events_in_range(
+            self, start: str, stop: str,
+            fields = ('id', 'start', 'stop','name')) -> list[dict]:
+        """
+        Returns a list of dictionaries, each one contains as keys the fields
+        requested if there is any registered event on Calendar.
+        """
+        return self.client.search_read(
+            model = CALENDAR.EVENT,
+            domain = [
+                ['start', '>=', start],
+                ['stop', '<=', stop]
+            ],
+            fields = fields
+        )
 
     def create_calendar_event(self, event: Event, printer=False) -> FlaskResponse:
         """
@@ -89,6 +105,7 @@ class Scheduler:
                 domains = event_domains,
                 printer=printer
             )
+            print(event_response)
             event.odoo_id = event_response.object
 
             if printer:

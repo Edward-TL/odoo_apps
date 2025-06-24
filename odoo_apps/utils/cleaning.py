@@ -3,11 +3,15 @@ TODO:
 * Crear las tablas para valores unicos de atributos y categorias
 * Diseñar las funciones para la concatenacion de las columnas correspondientes
 """
-
+import weakref
 from inspect import getmembers
 from typing import Literal
 from .operators import Operator
 
+def flat_list(nested_list: list) -> list:
+    """Flats a double list matrix"""
+    flat_list = [item for sublist in nested_list for item in sublist]
+    return flat_list
 
 def generate_dict(data_obj) -> dict:
     """
@@ -17,7 +21,7 @@ def generate_dict(data_obj) -> dict:
     """
     return {
         module[0]:module[1] for module in getmembers(
-            data_obj
+            weakref.ref(data_obj)
             ) if not module[0].startswith('__')
             }
 

@@ -1,11 +1,18 @@
 """
-"""
-from dataclasses import dataclass, field
-from datetime import datetime
+Contains Appointment Object
 
-from odoo_apps.utils.time_management import standarize_datetime
+"""
+from copy import copy
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
+from odoo_apps.utils.time_management import standarize_datetime, TIME_STR
 from odoo_apps.calendar.objects import Event, Alarm, BASIC_ALARM
 from odoo_apps.type_hints.time_zone import TimeZone
+
+from .checkers import validate_dates, create_next_week_days
+
 
 @dataclass
 class Appointment:
@@ -29,10 +36,11 @@ class Appointment:
         * odoo_id (int, optional): The ID of the appointment in Odoo (assigned after creation).
             Defaults to None.
     """
-    start_request: datetime | str
-    end_request: datetime | str
     resource_ids: int
     partner_ids: int | list[int]
+    date_time_range: Optional[str] = None
+    start_request: Optional[datetime | str] = None
+    end_request: Optional[datetime | str] = None
     type_id: int = 1
     datetime_is_standarized: bool = False
     name: str = 'Consulta' # Odoo often generates the name
@@ -40,17 +48,27 @@ class Appointment:
     description: str = "Consulta de prueba"
     capacity_reserved: int = 1
     capacity_used: int = 1
-    timezone_str: TimeZone | None = 'America/Mexico_City'
+    timezone_str: Optional[TimeZone] = 'America/Mexico_City'
     alarm_id: Alarm = BASIC_ALARM
-    odoo_id: int | None = None
-    calendar_event_id: int | None = None
+    odoo_id: Optional[int] = None
+    calendar_event_id: Optional[int] = None
+    optional_dates_range: Optional[list[datetime, datetime] | list[str, str]] = None
+    optional_hours_range: Optional[list[int, int]] = None
 
     def __post_init__(self):
         """
         Post-initialization to prepare data for Odoo RPC.
         Converts datetimes to UTC strings and prepares the data dictionary.
         """
+        self.start_request, self.end_request = validate_dates(
+            self.date_time_range, self.start_request, self.end_request
+        )
         # Format for Odoo RPC
+        if self.optional_dates_range is None:
+            self.optional_dates_range = create_next_week_days(self.start_request)
+
+        if self.optional_hours_range is None:
+            self.optional_hours_range = [8, 20]
         if self.datetime_is_standarized is False:
             self.start_utc_str = standarize_datetime(self.start_request, self.timezone_str)
             self.end_utc_str = standarize_datetime(self.end_request, self.timezone_str)
@@ -60,8 +78,8 @@ class Appointment:
             self.start_utc_str = self.start_request
             self.end_utc_str = self.end_request
 
-        print(self.start_utc_str)
-        print(self.end_utc_str)
+        # print(self.start_utc_str)
+        # print(self.end_utc_str)
         self.event = Event(
             name = self.name,
             start_datetime = self.start_utc_str,
@@ -113,5 +131,22 @@ class Appointment:
         }
 
 
+@dataclass
+class SlotEvent:
+    start: str | datetime
+    stop: str | datetime
 
+    def __post_init__(self):
+        if isinstance(self.start, str):
+            self.start_dt = datetime.strptime(self.start, TIME_STR)
+        else:
+            self.start_dt = copy(self.start)
+            self.start = datetime.strftime(self.start_dt, TIME_STR)
+
+        if isinstance(self.stop, str):
+            self.stop_dt = datetime.strptime(self.stop, TIME_STR)
+        else:
+            self.stop_dt = copy(self.stop)
+            self.stop = datetime.strftime(self.stop_dt, TIME_STR)
         # self.slot = {}
+

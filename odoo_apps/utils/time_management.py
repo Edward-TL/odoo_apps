@@ -1,8 +1,6 @@
 """
 Time manager
 """
-from pprint import pprint
-
 from datetime import datetime, timedelta
 from pytz import timezone
 from .timezones import TzNames
@@ -10,6 +8,7 @@ from .timezones import TzNames
 # If they are naive, assume they are in the specified timezone_str
 
 TIME_STR = "%Y-%m-%d %H:%M"
+DATE_STR = "%Y-%m-%d"
 def standarize_datetime(
         dt: datetime | str,
         tz_str: TzNames = 'America/Mexico_City',
@@ -23,11 +22,6 @@ def standarize_datetime(
     Returns:
         datetime: The UTC datetime as a string in the format 'YYYY-MM-DD HH:MM:SS'.
     """
-
-    print("DT")
-    pprint(dt)
-    print(type(dt))
-    print()
 
     if isinstance(dt, str):
         return adapt_datetime(dt, timeoffset)
