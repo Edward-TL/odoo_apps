@@ -2,7 +2,7 @@
 Contact book
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from odoo_apps.client import OdooClient
@@ -34,6 +34,7 @@ class ContactBook:
     create or edit it.
     """
     client: OdooClient
+    fields_ref: dict = field(default_factory=JSON_FIELDS_REF)
 
     def get_contact_id(
         self, by: ReferenceField, reference: str, operator: Operator = '='
