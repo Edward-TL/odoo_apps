@@ -3,8 +3,8 @@ Standard response
 """
 
 from dataclasses import dataclass
-from typing import Literal, Union
-from flask import Flask, make_response, jsonify
+from typing import Literal, Union, Optional
+from flask import Flask, make_response
 from flask import Response as FlaskResponse
 
 from .request import (
@@ -17,24 +17,42 @@ from .request import (
     )
 from .utils.cleaning import generate_dict
 
-meaning = {
-    201: 'Succes on creating',
-    200: 'Object already exists',
-    400: 'Something went wrong with the request',
-    406: 'Server could not produce an acceptable response',
-    409: 'Request OK. Not available'
+status_code_idea = {
+    201: 'Success on creating',
+    200: 'Object found/Action completed',
+    400: 'Request does not have all values needed',
+    404: 'Request is OK. Object was not found',
+    406: 'ValueError type on request values',
+    409: 'Request is OK. Object has a conflict (overlaps/busy/taken)'
 }
 
-http_meaning = {
-    201: 'SUCCESS',
-    200: 'PASS',
+meaning_code = {
+    'OK': 200,
+    'CREATED': 201,
+    'BAD REQUEST': 400,
+    'NOT FOUND': 404,
+    'NOT ACCEPTABLE': 406,
+    'CONFLICT': 409
+}
+
+code_meaning = {
+    200: 'OK',
+    201: 'CREATED',
     400: 'BAD REQUEST',
+    404: 'NOT FOUND',
     406: 'NOT ACCEPTABLE',
     409: 'CONFLICT'
 }
 
-HttpStatus = Literal[201, 200, 406, 409, 400]
-StatusMeaning = Literal['SUCCESS', 'PASS', 'FAIL', 'CONFLICT', 'BAD REQUEST']
+HttpStatus = Literal[
+    200, 201,
+    406, 409, 400, 404
+    ]
+
+StatusMeaning = Literal[
+    'OK', 'CREATED',
+    'FAIL', 'CONFLICT', 'BAD REQUEST', 'NOT FOUND'
+    ]
 Action = Literal['read', 'search', 'create', 'update', 'delete']
 
 # Just an Idea, that will evolve
@@ -55,19 +73,29 @@ class Response:
     """
     action: Action
     model: str
-    object: int | list[int] | list[list[int, str]] | bool | None = None
-    status: StatusMeaning = 'SUCCESS'
-    http_status: HttpStatus = 201
-    msg: str | None = None
+    msg: Optional[str] = None
+    object: Optional[int | list[int] | list[list[int, str]] | bool] = None
+    status: Optional[StatusMeaning] = None
+    status_code: Optional[HttpStatus] = None
 
     def __post_init__(self):
+        if self.status_code is not None and self.status is None:
+            self.status = code_meaning[self.status_code]
+
+        if self.status_code is None and self.status is not None:
+            self.status_code = meaning_code[self.status]
+
+
+        if self.msg is None and self.status_code is not None:
+            self.msg = status_code_idea[self.status_code]
+
         self.data = generate_dict(self)
 
     def update_message(self, error_message="") -> str:
         message = ""
         message += f"{self.status} | "
         if self.status != 'FAIL':
-            message += f"Message: {meaning[self.http_status]} | "
+            message += f"Message: {status_code_idea[self.status_code]} | "
         else:
             message += f"Error: {error_message}"
         message += f"Action: {self.action} | "
@@ -88,8 +116,8 @@ class Response:
         ):
 
         self.object = obj_id
-        self.status = http_meaning[status]
-        self.http_status = status
+        self.status = code_meaning[status]
+        self.status_code = status
         if msg != "":
             self.msg = msg
         else:
@@ -105,7 +133,7 @@ class Response:
             "model": self.model,
             "object": self.object,
             "status": self.status,
-            "http_status": self.http_status,
+            "status_code": self.status_code,
             "msg": self.msg
         }
 
@@ -123,8 +151,8 @@ def report_fail(
         action = action,
         model = model,
         object = None,
-        status = http_meaning[http_status],
-        http_status = http_status,
+        status = meaning_code[http_status],
+        status_code = http_status,
         msg = msg
     )
 
@@ -133,7 +161,7 @@ def standarize_response(request: Request, response: Response) -> FlaskResponse:
     Function to simplifys the reponse generation
     """
     app = Flask(__name__)
-    response_status = int(response.http_status)
+    response_status = int(response.status_code)
 
     data = {
         "message": response.msg,

@@ -186,6 +186,7 @@ class OdooClient:
             print("Exist: ", exists)
         
         if not exists:
+            # print('Creando en', model, vals)
             try:
                 # CORE ACTIVITY
                 object_id = self.models.execute(
@@ -200,6 +201,7 @@ class OdooClient:
                 return response
 
             except Exception as e:
+                # print(e)
                 response.complete_response(
                     obj_id = False,
                     status = 406,
@@ -207,16 +209,19 @@ class OdooClient:
                     printer = printer
                 )
                 return response
+        
         # IF EXISTS
         if isinstance(exists,list):
             object_id = exists[0]
         else:
             object_id = exists
+
         response.complete_response(
             obj_id = object_id,
             status = 200,
             printer = printer
         )
+
         return response
 
     def update(self,
