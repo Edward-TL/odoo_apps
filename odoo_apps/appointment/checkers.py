@@ -44,7 +44,7 @@ def create_busy_response(object_id) -> Response:
     )
 
 def create_bad_request_response(
-        msg: str, action: Literal['update', 'cancel', 'create'] = 'update'
+        msg: str, action: Literal['search', 'update', 'cancel', 'create'] = 'update'
         ) -> Response:
     return Response(
         action = action,

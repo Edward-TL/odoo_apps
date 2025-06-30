@@ -63,15 +63,26 @@ class AppointmentManager:
     def __post_init__(self):
         self.scheduler = Scheduler(self.client)
 
-    def get_booking_url(self, appointment_type_id: int):
+    def get_booking_url(self, appointment_type_id: int, as_response=False) -> str | Response:
         """
         Returns the webpage url to schedule and appointment by website
         """
-        return self.client.search_read(
+        booking_url = self.client.search_read(
             model = APPOINTMENT.INVITE,
             domain = [('appointment_type_ids','=', appointment_type_id)],
             fields = ['book_url']
         )[0]['book_url']
+
+        if as_response:
+            return Response(
+                action = "search",
+                model = APPOINTMENT.INVITE,
+                object = booking_url,
+                status_code = 200,
+                status = "OK"
+            )
+        
+        return booking_url
     
     def check_weekday_slots(
             self,
@@ -204,9 +215,9 @@ class AppointmentManager:
     
     def look_for_slots(
         self,
-        appointment_type_id: int,
-        dates_range: list[datetime, datetime] | list[str, str],
-        hours_range: list[int, int],
+        appointment_type_id: Optional[int] = None,
+        dates_range: Optional[list[datetime, datetime] | list[str, str]] = None,
+        hours_range: Optional[list[int, int]] = None,
         request_body: Optional[dict] = None
     ) -> list[dict]:
         """
@@ -229,10 +240,25 @@ class AppointmentManager:
         if there is no "available_slots" in response['object'], it means that there is no
         available slots, but you can check on the booking_url for every need
         """
+        if request_body is not None:
+            dates_range = request_body['optional_date_range']
+            hours_range = request_body['prefered_hours']
+            appointment_type_id = request_body['appointment_type_id']
+
+        if all(
+            [appointment_type_id is None, dates_range is None,
+             hours_range is None, request_body is None]):
+
+            error_msg = "No data provided to search for slots. Please provide:\n"
+            error_msg += "  a) appointment_type_id, optional_date_range and prefered_hours \n"
+            error_msg += "  b) Request Body with previous options inside" \
+
+            raise ValueError(error_msg)
+
         dates_range_error = check_dates_range(dates_range)
         if dates_range_error:
             return dates_range_error
-        
+
         hours_range_error = check_hours_range(hours_range)
         if hours_range_error:
             return hours_range_error
