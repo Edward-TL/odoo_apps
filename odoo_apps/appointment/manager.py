@@ -441,8 +441,7 @@ class AppointmentManager:
             return self.look_for_slots(
                 appointment_type_id = appointment.type_id,
                 dates_range = appointment.optional_dates_range,
-                hours_range = appointment.optional_hours_range,
-                request_body = appointment.requested_data()
+                hours_range = appointment.optional_hours_range
             )
     
         if printer:

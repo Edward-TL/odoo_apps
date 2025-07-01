@@ -4,7 +4,7 @@ setup(
     author = "Edward Toledo Lopez",
     description = "A traduction of Oddo's RPC into classes.",
     name = "odoo_apps",
-    version = "0.3.1",
+    version = "0.3.2",
     packages=find_packages(
         include=[
             "requests (>=2.32.3,<3.0.0)",
