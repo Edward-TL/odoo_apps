@@ -1,6 +1,6 @@
 [project]
 name = "odoo_apps"
-version = "0.3.2"
+version = "0.3.3"
 description = "A traduction of Odoos's RPC into classes."
 authors = [
     {name = "Edward Toledo Lopez",email = "edward_tl@hotmail.com"}

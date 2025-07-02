@@ -63,15 +63,25 @@ class AppointmentManager:
     def __post_init__(self):
         self.scheduler = Scheduler(self.client)
 
-    def get_booking_url(self, appointment_type_id: int, as_response=False) -> str | Response:
+    def get_booking_url(self, appointment_type_id: int | str, as_response=False) -> str | Response:
         """
         Returns the webpage url to schedule and appointment by website
         """
-        booking_url = self.client.search_read(
+        if isinstance(appointment_type_id, str):
+            if not appointment_type_id.isdigit():
+                return create_bad_request_response(
+                    msg = 'If str, `appointment_type_id` must be a digit',
+                    action = 'search'
+                )
+            appointment_type_id = int(appointment_type_id)
+            
+        booking_url_response = self.client.search_read(
             model = APPOINTMENT.INVITE,
-            domain = [('appointment_type_ids','=', appointment_type_id)],
+            domain = [['appointment_type_ids','=', appointment_type_id]],
             fields = ['book_url']
-        )[0]['book_url']
+        )
+        print(booking_url_response)
+        booking_url = booking_url_response[0]['book_url']
 
         if as_response:
             return Response(
