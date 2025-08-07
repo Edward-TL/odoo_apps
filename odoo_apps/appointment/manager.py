@@ -399,7 +399,7 @@ class AppointmentManager:
         if request['appointment_type_id'] is None:
             existing_ids = self.client.search(
                 model = APPOINTMENT.TYPE,
-                domains = [
+                domain = [
                     ('active', '=', True),
                     ('name', '=', request['name_type'])
                 ]
@@ -559,7 +559,7 @@ class AppointmentManager:
 
         can_modify = self.client.search(
             model = CALENDAR.EVENT,
-            domains = [
+            domain = [
                 ['id', '=', appointment.calendar_event_id],
                 ['partner_ids', '=', appointment.partner_ids]
             ]
@@ -657,7 +657,7 @@ class AppointmentManager:
         
         can_cancel = self.client.search(
             model = CALENDAR.EVENT,
-            domains = [
+            domain = [
                 ['id', '=', request_body['calendar_event_id']],
                 ['partner_ids', '=', request_body['partner_ids']]
             ]

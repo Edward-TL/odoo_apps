@@ -176,7 +176,7 @@ class Scheduler:
 
         event_exists = self.client.search(
             model = CALENDAR.EVENT,
-            domains = [
+            domain = [
                 ['id', '=', event_id]
             ]
         )

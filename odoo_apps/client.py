@@ -41,19 +41,38 @@ class OdooClient:
     Odoo client server class to interact with Odoo XML-RPC API.
     """
 
-    user_info: OrderedDict[str, str]
+    user_info: Optional[OrderedDict[str, str]] = None
+    url: Optional[str] = None
+    db: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
 
     def __post_init__(self):
-        self.url = self.user_info['HOST']
-        self.db = self.user_info['DB']
-        self.username = self.user_info['USER']
-        self.password = self.user_info['PASSWORD']
+        if all([
+          self.user_info is None,
+          self.url is None,
+          self.db is None,
+          self.username is None,
+          self.password is None
+        ]):
+            no_data = "No data was given. Please give: \n"
+            no_data += "a) host, db, username and password. \n"
+            no_data += "b) user_info as a dictionary, with the keys "
+            no_data += "in uppercase `URL`, `DB`, `USERNAME`, `PASSWORD` on it's keys. \n"
+            no_data += "more info at: https://www.odoo.com/documentation/18.0"
+            no_data += "/es_419/developer/reference/external_api.html"
+            raise ValueError(no_data)
+        if self.user_info is not None:
+            self.url = self.user_info['URL']
+            self.db = self.user_info['DB']
+            self.username = self.user_info['USERNAME']
+            self.password = self.user_info['PASSWORD']
 
         common = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/common')
         self.uid = common.authenticate(self.db, self.username, self.password, {})
         self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
 
-    def search(self, model: str, domains: list[tuple[str,str,str]]) -> list[int]:
+    def search(self, model: str, domain: list[tuple[str,str,str]]) -> list[int]:
         #request: SearchRequest):
         '''
         Search for records in the specified model that match the given domain.
@@ -65,7 +84,7 @@ class OdooClient:
         return self.models.execute_kw(
             self.db, self.uid, self.password,
             model, "search",
-            [domains]
+            [domain]
         )
         # return self.models.execute_kw(
         #     self.db, self.uid, self.password,
@@ -103,7 +122,7 @@ class OdooClient:
     def search_read(self,
             model: str,
             domain: list[tuple[str,str,str]] = [('id', '>', 0)],
-            fields: list[str] = ['name'],
+            fields: Optional[list[str]] = None,
             limit: Optional[int] = None,
             order: Optional[str] = None
         ):#request: SearchReadRequest):
@@ -122,6 +141,9 @@ class OdooClient:
         #     [[('customer_rank', '>', 0)]],
         #     {'fields': ['name', 'phone'], 'limit': 10, 'order': 'name asc'}
         # )
+        if fields is None:
+            fields = self.get_models_fields(model)
+            
         query_structure = {'fields': fields}
 
         if limit is not None:
@@ -144,6 +166,7 @@ class OdooClient:
         domain_fields: Union[list[str], str] = 'name',
         domain_operators: Operator | list[Operator] = '=',
         domains: Optional[ list[tuple[str, Operator, str]] ] = None,
+        hard: bool = False,
         printer = False
         ) -> Response:
         '''
@@ -169,21 +192,25 @@ class OdooClient:
             action = 'create',
             model = model
             )
-        if domains is None:
-            domains = check_domains(
-                domain_fields = domain_fields,
-                domain_operators = domain_operators,
-                vals = vals
-            )
-
-        exists = self.search(
-            model = model,
-            domains = domains
-        )
         
-        if printer:
-            print("DOMAINS: ", domains)
-            print("Exist: ", exists)
+        if hard:
+            exists = False
+        else:
+            if domains is None:
+                domains = check_domains(
+                    domain_fields = domain_fields,
+                    domain_operators = domain_operators,
+                    vals = vals
+                )
+
+            exists = self.search(
+                model = model,
+                domain = domains
+            )
+            
+            if printer:
+                print("DOMAINS: ", domains)
+                print("Exist: ", exists)
         
         if not exists:
             # print('Creando en', model, vals)
