@@ -3,9 +3,15 @@ TODO:
 * Crear las tablas para valores unicos de atributos y categorias
 * Diseñar las funciones para la concatenacion de las columnas correspondientes
 """
-import weakref
+from copy import copy
 from inspect import getmembers
-from typing import Literal
+
+from typing import Literal, Optional
+import weakref
+
+# import numpy as np
+import pandas as pd
+
 from .operators import Operator
 
 def flat_list(nested_list: list) -> list:
@@ -107,7 +113,148 @@ def check_domains(
 
     return ([],[],[])
 
-def replace_values(old_val, new_val, array: list) -> None:
-    if old_val in array:
-        name_idx = array.index(old_val)
-        array[name_idx] = new_val
+# def replace_values(old_val, new_val, array: list) -> None:
+#     if old_val in array:
+#         name_idx = array.index(old_val)
+#         array[name_idx] = new_val
+
+def transform_dict_array_to_dict(
+        dict_array: list[dict],
+        key_ref: Literal['name', 'display_name'] = 'name',
+        key_val: str = 'id') -> dict:
+    """
+    From a list of dictionaries, transform it to a single dictionary.
+
+    Args:
+        dict_array: list[dict] F.E. [{'id':1, 'name':'foo'}, {'id':2, 'name':'bar'}]
+        key_ref: str. FE: 'name'
+        key_val: str. FE: 'id'
+
+    Returns:
+        dict. FE: {'foo':1, 'bar':2}
+    """
+    
+    return {
+        value[key_ref]: value[key_val] for value in dict_array
+        }
+
+def merge_dictionaries(
+        parent:dict, child: list[dict],
+        parent_ref: str = 'attribute_id',
+        p_idx: Optional[int] = 1,
+        child_key: str = 'name',
+        child_val: str = 'id') -> dict:
+    """
+    Generates a tree dict with the followed structure:
+    {
+    'parent': {
+        'child_key': child_val
+    }
+
+    Args:
+        - parent [dict]: a Dictionary with root values. FE: Attributes.
+        {'foo': 1, 'bar':2}
+        - child [list[dict]]: A list of dictionaries, that stores
+        data related to the parents. FE: values of the attributes.
+        [
+            {'id': 1, 'name': 'val_1', 'attribute_id': [1, 'foo']},
+            {'id': 2, 'name': 'val_2', 'attribute_id': [2, 'bar']}
+        ]
+        - parent_ref [str]: Reference in child to get the reference of the parent.
+        
+        - p_idx Optional[int]: If parent_ref is stored in a list (as the example), will
+        use the idx call. If not, it's omitted when generated.
+        - child_key [str]: Is the key that calls the child's key that will vall the value
+        stored in child's dict. In this example: 'name'.
+        - child_val [str]: Is the key that calls the value stored in child's dict.
+            In this example: 'id'.
+        
+    Returns:
+        dict
+
+    In this example:
+    {
+        'foo': {
+            'val_1': 1
+        },
+        'bar': {
+            'val_2: 2
+        }
+    }
+    
+    """
+
+    # ORIGINAL:
+    # self.att_values = {att: {} for att in self.attributes.keys()}
+    
+    # for val_data in vals:
+    #     self.att_values[
+    #         val_data['attribute_id'][1]
+    #         ][val_data['name']] = val_data['id']
+    tree_dict = {att: {} for att in parent.keys()}
+
+    if p_idx is not None:
+        for val_data in child:
+            tree_dict[
+                # Parent reference. 
+                val_data[parent_ref][p_idx]
+                ][
+                    # Consider when created, tree_dict stored an empty set
+                    # or dictionary ('{}'). So this turns into the new key
+                    val_data[child_key]
+                        # The new value
+                    ] = val_data[child_val]
+
+        return tree_dict
+
+    for val_data in child:
+        tree_dict[
+            # Parent reference. 
+            val_data[parent_ref]
+            ][
+                # Consider when created, tree_dict stored an empty set
+                # or dictionary ('{}'). So this turns into the new key
+                val_data[child_key]
+                    # The new value
+                ] = val_data[child_val]
+
+        return tree_dict
+
+def gen_matrix(raw_data: list[dict]) -> dict[str, list]:
+    """
+    From a list of dictionaries, creates a dictionary that stores all values in list.
+    """
+    
+    matrix = {
+        key: [None]*len(raw_data) for key in raw_data[0].keys()
+    }
+
+    for n, data in enumerate(raw_data):
+        for k,v in data.items():
+            matrix[k][n] = v
+
+    return matrix
+
+def split_id_pair(matrix: dict[str, list]) -> dict[str, list]:
+    """
+    Transforms keys ending with `_id` that stores [id: int, name: str] into two
+    separated keys
+    """
+    clean_matrix = copy(matrix)
+
+    for k, vals in matrix.items():
+        key = copy(k)
+        if key.endswith('_id'):
+            # there are values that are optional (like categories). And if the user
+            # doesn't give a value, will appear as False, instead of a list like [False, False],
+            # creating an error if this is not considerated
+            clean_matrix[key] = [v[0] if isinstance(v, list) else False for v in vals]
+            clean_matrix[key.replace('_id','_name')] = [v[1] if isinstance(v, list) else False for v in vals]
+
+    return clean_matrix
+
+def extract_cell_value(df: pd.DataFrame, col_ref: str, val_ref:str | int | float | list | dict, val_col: str):
+    """
+    return df[df[col_ref] == val_ref][val_col].values[0]
+    """
+    return df[df[col_ref] == val_ref][val_col].values[0]

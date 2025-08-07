@@ -1,6 +1,2 @@
-"""
-STOCK init file
-"""
-from odoo_apps.utils.time_management import standarize_datetime
 from odoo_apps.utils.operators import Operator
 from odoo_apps.response import Response, standarize_response
