@@ -156,7 +156,7 @@ class TestStockManager:
         attributes = [
             odoo.search(
                 model = PRODUCT.ATTRIBUTE,
-                domains = [('name', '=', test_attribute)]
+                domain = [('name', '=', test_attribute)]
             ) for test_attribute in creation_attributes
         ]
 

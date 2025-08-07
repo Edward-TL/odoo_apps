@@ -73,7 +73,7 @@ class TestOdooClient:
         """
         categories = odoo.search(
             model = PRODUCT.CATEGORY,
-            domains = [(['name', '=', CREATION_TEST_CATEGORY])]
+            domain = [(['name', '=', CREATION_TEST_CATEGORY])]
         )
         # print(f"{CREATION_TEST_CATEGORY} IDs: {response}")
         assert len(categories) > 0
@@ -84,7 +84,7 @@ class TestOdooClient:
         """
         test_ids = odoo.search(
             model = PRODUCT.CATEGORY,
-            domains = [(['name', '=', CREATION_TEST_CATEGORY])]
+            domain = [(['name', '=', CREATION_TEST_CATEGORY])]
         )
         
         odoo.update(
@@ -96,7 +96,7 @@ class TestOdooClient:
 
         update_confirmation_response = odoo.search(
             model = PRODUCT.CATEGORY,
-            domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+            domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
         )
         assert len(update_confirmation_response) > 0
 
@@ -108,7 +108,7 @@ class TestOdooClient:
         
         response = odoo.search(
                 model = PRODUCT.CATEGORY,
-                domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+                domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
         )
         
         test_stock_manager.create_product_category(
@@ -118,7 +118,7 @@ class TestOdooClient:
 
         child_response = odoo.search(
                 model = PRODUCT.CATEGORY,
-                domains = [(['parent_id', '=', response[0]])]
+                domain = [(['parent_id', '=', response[0]])]
         )
 
         assert len(child_response) > 0
@@ -130,12 +130,12 @@ class TestOdooClient:
         
         parents_id = odoo.search(
             model = PRODUCT.CATEGORY,
-            domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+            domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
         )
 
         child_id = odoo.search(
             model = PRODUCT.CATEGORY,
-            domains = [(['name', '=', CHILD_TEST_CATEGORY])]
+            domain = [(['name', '=', CHILD_TEST_CATEGORY])]
         )[0]
 
         delete_ids = [id_ for id_ in parents_id]
@@ -158,13 +158,13 @@ class TestOdooClient:
         assert len(
             odoo.search(
                 model = PRODUCT.CATEGORY,
-                domains = [(['name', '=', UPDATE_TEST_CATEGORY])]
+                domain = [(['name', '=', UPDATE_TEST_CATEGORY])]
             )
         ) == 0
 
         assert len(
             odoo.search(
                 model = PRODUCT.CATEGORY,
-                domains = [(['name', '=', CHILD_TEST_CATEGORY])]
+                domain = [(['name', '=', CHILD_TEST_CATEGORY])]
             )
         ) == 0
