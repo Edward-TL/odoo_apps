@@ -2,18 +2,29 @@
 Store interest Odoo models
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+import inspect
 from .utils.cleaning import generate_dict
 
+@dataclass
+class TableExample:
+    """
+    Example of a table
+    """
+    _name = 'name'
+    module = 'name.module'
+    def __post_init__(self):
+        self.modules = generate_dict(self)
 
-def string_class(data_obj) -> str:
+def string_class(data_obj: TableExample) -> str:
     """
     Generate a string representation of the class.
     :param data_obj: Data Class to generate the string from.
     :return: String representation of the class.
     """
     str_class = ""
-    for k,v in data_obj._modules.items():
+    print(data_obj.modules.items)
+    for k,v in data_obj.modules.items():
         str_class += f"{k}: {v} \n"
 
     return str_class
@@ -51,7 +62,9 @@ class Product:
     UNSPSC_CODE = 'product.unspsc.code'
 
     def __post_init__(self):
-        self._modules = generate_dict(self)
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
 
     def __str__(self):
         return string_class(self)
@@ -113,7 +126,9 @@ class Stock:
     WARN_INSUFFICIENT_QTY_UNBUILD = 'stock.warn.insufficient.qty.unbuild'
 
     def __post_init__(self):
-        self._modules = generate_dict(self)
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
 
     def __str__(self):
         return string_class(self)
@@ -140,7 +155,9 @@ class Calendar:
     RECURRENCE = 'calendar.recurrence'
 
     def __post_init__(self):
-        self._modules = generate_dict(self)
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
 
     def __str__(self):
         return string_class(self)
@@ -164,7 +181,9 @@ class Appointment:
     TYPE = 'appointment.type'
 
     def __post_init__(self):
-        self._modules = generate_dict(self)
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
 
     def __str__(self):
         return string_class(self)
@@ -207,7 +226,9 @@ class Resource:
     RESOURCE = 'resource.resource'
 
     def __post_init__(self):
-        self._modules = generate_dict(self)
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
 
     def __str__(self):
         return string_class(self)
@@ -230,9 +251,90 @@ class Contacts:
     USERS = 'res.users'
 
     def __post_init__(self):
-        self._modules = generate_dict(self)
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
 
     def __str__(self):
         return string_class(self)
-    
+
 CONTACTS = Contacts()
+
+@dataclass
+class Pos:
+    """Point Of Sale tables"""
+    _name = 'pos'
+    BILL = 'pos.bill'
+    BUS_MIXIN = 'pos.bus.mixin'
+    CATEGORY = 'pos.category'
+    CLOSE_SESSION_WIZARD = 'pos.close.session.wizard'
+    CONFIG = 'pos.config'
+    DAILY_SALES_REPORTS_WIZARD = 'pos.daily.sales.reports.wizard'
+    DETAILS_WIZARD = 'pos.details.wizard'
+    LOAD_MIXIN = 'pos.load.mixin'
+    MAKE_PAYMENT = 'pos.make.payment'
+    NOTE = 'pos.note'
+    ORDER_LINE = 'pos.order.line'
+    ORDER = 'pos.order'
+    PACK_OPERATION_LOT = 'pos.pack.operation.lot'
+    PAYMENT_METHOD = 'pos.payment.method'
+    PAYMENT = 'pos.payment'
+    PRINTER = 'pos.printer'
+    SESSION = 'pos.session'
+    DISPLAY = 'pos_preparation_display.display'
+    ORDER_STAGE = 'pos_preparation_display.order.stage'
+    ORDER = 'pos_preparation_display.order'
+    ORDERLINE = 'pos_preparation_display.orderline'
+    RESET_WIZARD = 'pos_preparation_display.reset.wizard'
+    STAGE = 'pos_preparation_display.stage'
+    CUSTOM_LINK = 'pos_self_order.custom_link'
+
+    def __post_init__(self):
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
+
+    def __str__(self):
+        return string_class(self)
+
+POS = Pos()
+
+@dataclass
+class Sales:
+    """Sales tables"""
+    _name = 'sale'
+    ADVANCE_PAYMENT_INV = 'sale.advance.payment.inv'
+    EDI_COMMON = 'sale.edi.common'
+    EDI_XML_UBL_BIS3 = 'sale.edi.xml.ubl_bis3'
+    LOYALTY_COUPON_WIZARD = 'sale.loyalty.coupon.wizard'
+    LOYALTY_REWARD_WIZARD = 'sale.loyalty.reward.wizard'
+    MASS_CANCEL_ORDERS = 'sale.mass.cancel.orders'
+    ORDER_ALERT = 'sale.order.alert'
+    ORDER_CANCEL = 'sale.order.cancel'
+    ORDER_CLOSE_REASON = 'sale.order.close.reason'
+    ORDER_COUPON_POINTS = 'sale.order.coupon.points'
+    ORDER_DISCOUNT = 'sale.order.discount'
+    ORDER_LINE = 'sale.order.line'
+    ORDER_LOG = 'sale.order.log'
+    ORDER_LOG_REPORT = 'sale.order.log.report'
+    ORDER_OPTION = 'sale.order.option'
+    ORDER_SPREADSHEET = 'sale.order.spreadsheet'
+    ORDER_TEMPLATE = 'sale.order.template'
+    ORDER_TEMPLATE_LINE = 'sale.order.template.line'
+    ORDER_TEMPLATE_OPTION = 'sale.order.template.option'
+    ORDER = 'sale.order'
+    PAYMENT_PROVIDER_ONBOARDING_WIZARD = 'sale.payment.provider.onboarding.wizard'
+    PDF_FORM_FIELD = 'sale.pdf.form.field'
+    REPORT = 'sale.report'
+    SUBSCRIPTION_CHANGE_CUSTOMER_WIZARD = 'sale.subscription.change.customer.wizard'
+    SUBSCRIPTION_CLOSE_REASON_WIZARD = 'sale.subscription.close.reason.wizard'
+    SUBSCRIPTION_PLAN = 'sale.subscription.plan'
+    SUBSCRIPTION_PRICING = 'sale.subscription.pricing'
+    SUBSCRIPTION_REPORT = 'sale.subscription.report'
+    def __post_init__(self):
+        self.modules = generate_dict(self)
+
+    def __str__(self):
+        return string_class(self)
+
+SALES = Sales()
