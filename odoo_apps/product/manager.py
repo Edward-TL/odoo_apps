@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Literal
 from copy import copy
 from pprint import pprint
+from xmlrpc.client import Fault
 
 import pandas as pd
 from numpy import nan as np_nan
@@ -64,7 +65,8 @@ class ProductManager:
     pos_cat_col: str = None
     stock_pos_cat: Literal['same', 'different'] = 'same'
     categories: Optional[list | dict[str | int]] = None
-    pos_categories: Optional[dict] = None
+    pos_categories: Optional[list | dict] = None
+    public_categories: Optional[list | dict] = None
     
     # Attributes_related
     attributes: Optional[dict | list] = None
@@ -121,8 +123,21 @@ class ProductManager:
 
             # ==============[ categories ]==============================
             if self.pos_categories is None:
-                print('Getting ALL categories ID')
-                self.get_all_pos_categories()
+                print('Getting ALL POS categories ID')
+                try:
+                    self.get_all_pos_categories()
+                except Exception as e:
+                    if e is Fault:
+                        print(type(e), e)
+                    pass
+
+            if self.public_categories is None:
+                print('Getting ALL PUBLIC categories ID')
+                try:
+                    self.get_all_public_categories()
+                except Exception as e:
+                    print(type(e), e)
+                    pass
             
             # ==============[ Attributes ]==============================
             if self.attributes is None:
@@ -224,51 +239,52 @@ class ProductManager:
                 ]
             )
 
-            tav_matrix = gen_matrix(self.raw_template_attributes_value_data)
-            tav_matrix = split_id_pair(tav_matrix)
-            
-            # pprint(self.id_att_val)
-            # pprint(self.att_values)
-            mixed_ids = {}
-            for n, att_val_id in enumerate(tav_matrix['product_attribute_value_id']):
-                try:
-                    tav_matrix["product_attribute_value_name"][n] = self.id_att_val[att_val_id]
-                except KeyError:
-                    if att_val_id not in mixed_ids:
-                        mixed_ids[att_val_id] = self.client.search_read(
-                            PRODUCT.ATTRIBUTE_VALUE,
-                            [
-                                ['id', '=', att_val_id]
-                            ],
-                            ['id', 'display_name']
-                        )[0]['display_name']
+            if len(self.raw_template_attributes_value_data) > 0:
+                tav_matrix = gen_matrix(self.raw_template_attributes_value_data)
+                tav_matrix = split_id_pair(tav_matrix)
+                
+                # pprint(self.id_att_val)
+                # pprint(self.att_values)
+                mixed_ids = {}
+                for n, att_val_id in enumerate(tav_matrix['product_attribute_value_id']):
+                    try:
+                        tav_matrix["product_attribute_value_name"][n] = self.id_att_val[att_val_id]
+                    except KeyError:
+                        if att_val_id not in mixed_ids:
+                            mixed_ids[att_val_id] = self.client.search_read(
+                                PRODUCT.ATTRIBUTE_VALUE,
+                                [
+                                    ['id', '=', att_val_id]
+                                ],
+                                ['id', 'display_name']
+                            )[0]['display_name']
 
-                    tav_matrix["product_attribute_value_name"][n] = mixed_ids[att_val_id]
+                        tav_matrix["product_attribute_value_name"][n] = mixed_ids[att_val_id]
 
-            if len(mixed_ids):
-                warning_msg = f"WARNING!> attribute_value_ids: {mixed_ids} got lost in gen_matrix.\n"
-                warning_msg += "WARNING!> It's cuase because there is a duplicate attribute_value in "
-                warning_msg += "the same attribute. \n"
-                warning_msg += "WARNING!> Update all products with this id to it's"
-                warning_msg += " new value."
-                print(warning_msg)
-            self.template_attributes_value_matrix = tav_matrix
+                if len(mixed_ids):
+                    warning_msg = f"WARNING!> attribute_value_ids: {mixed_ids} got lost in gen_matrix.\n"
+                    warning_msg += "WARNING!> It's cuase because there is a duplicate attribute_value in "
+                    warning_msg += "the same attribute. \n"
+                    warning_msg += "WARNING!> Update all products with this id to it's"
+                    warning_msg += " new value."
+                    print(warning_msg)
+                self.template_attributes_value_matrix = tav_matrix
 
-            products_matrix = gen_matrix(self.raw_products_data)
+                products_matrix = gen_matrix(self.raw_products_data)
 
-            
-            self.products_matrix = split_id_pair(products_matrix)
-            del self.products_matrix['product_variant_name']
+                
+                self.products_matrix = split_id_pair(products_matrix)
+                del self.products_matrix['product_variant_name']
 
-            self.products_matrix['product_template_variant_value_ids'] = [
-                reference_clasifier(ptvv_ref) for ptvv_ref in self.products_matrix['product_template_variant_value_ids']
-            ]
+                self.products_matrix['product_template_variant_value_ids'] = [
+                    reference_clasifier(ptvv_ref) for ptvv_ref in self.products_matrix['product_template_variant_value_ids']
+                ]
 
-            self.data_available = {
-                'category': self.categories,
-                'attribute': self.attributes,
-                'product_template': set(self.templates_names)
-            }
+                self.data_available = {
+                    'category': self.categories,
+                    'attribute': self.attributes,
+                    'product_template': set(self.templates_names)
+                }
 
     def get_all_categories(self) -> None:
         """
@@ -285,6 +301,17 @@ class ProductManager:
         self.pos_categories = transform_dict_array_to_dict(
                 dict_array = self.get_all_values(
                     POS.CATEGORY, fields = ['id', 'display_name']
+                    ),
+                    key_ref = 'display_name'
+            )
+        
+    def get_all_public_categories(self) -> None:
+        """
+        Gets all POS categories stored on Odoo database, and stores it at `self.pos_categories`
+        """
+        self.public_categories = transform_dict_array_to_dict(
+                dict_array = self.get_all_values(
+                    PRODUCT.PUBLIC_CATEGORY, fields = ['id', 'display_name']
                     ),
                     key_ref = 'display_name'
             )
@@ -376,15 +403,22 @@ class ProductManager:
             int | False: El ID de la nueva categoría creada en Odoo, o False si hubo un error.
         """
         
-        category_data = {
-            'name': category_name,
-            'parent_id': parent_id,
-        }
+        category_data = {'name': category_name}
+        cat_domain = [
+            ['name', '=', category_name]
+        ]
+        if parent_id:
+            category_data['parent_id'] = parent_id
+            cat_domain.append(['parent_id', '=', parent_id])
 
         category_response = self.client.create(
             model = PRODUCT.CATEGORY,
-            vals = category_data
+            vals = category_data,
+            domains = cat_domain
         )
+
+        if category_response.status_code in [200, 201]:
+            self.categories[category_name] = category_response.object
 
         return category_response
 
@@ -410,6 +444,9 @@ class ProductManager:
             vals = category_data
         )
 
+        if category_response.status_code in [200, 201]:
+            self.pos_categories[category_name] = category_response.object
+
         return category_response
     
     def create_attribute(self, name: str,
@@ -421,18 +458,21 @@ class ProductManager:
         """
         
         att_response = self.client.create(
-            model = 'product.attribute',
+            model = PRODUCT.ATTRIBUTE,
             vals = {
                     'name': name,
                     'display_type': display_type,
                     'create_variant': create_variant,
                 }
         )
+
+        if att_response.status_code in [200, 201]:
+            self.attributes[name] = att_response.object
         
         return att_response
 
     def append_attribute_value(
-        self, attribute_id: int | str, name: str,
+        self, attribute_id: int | str, value_name: str,
         default_extra_price: float | None = None,
         html_color: str | None = None,
         image: str | None = None
@@ -441,21 +481,28 @@ class ProductManager:
         Append values to an existing Attribute
         """
         # If it's a string, it's because it's not known the attribute_id
+        att_domain = None
+        attribute_name = None
         if isinstance(attribute_id, str):
-            attribute_id = self.client.search(
-                model = PRODUCT.ATTRIBUTE,
-                domain = [('name', '=', attribute_id)]
-            )
+            if attribute_id not in self.attributes:
+                att_domain = [('name', '=', attribute_id)]
+                attribute_sr = self.client.search_read(
+                    model = PRODUCT.ATTRIBUTE,
+                    domain = att_domain,
+                    fields = ['id','name']
+                )
 
-            if isinstance(attribute_id, list):
-                attribute_id = attribute_id[0]
-            else:
-                attribute_id = self.client.create(
-                    PRODUCT.ATTRIBUTE, {'name':name}
-            )
-        
+                attribute_id = attribute_sr['id']
+                attribute_name = attribute_sr['name']
+
+        if isinstance(attribute_id, int):
+            attribute_name = [
+                key for key, val in self.attributes.items() \
+                if val == attribute_id
+            ][0]
+
         attribute_data = {
-                'name': name,
+                'name': value_name,
                 'attribute_id': attribute_id
             }
         if html_color:
@@ -471,10 +518,14 @@ class ProductManager:
                 PRODUCT.ATTRIBUTE_VALUE,
                 attribute_data,
                 domains = [
-                    ['name', '=', name],
+                    ['name', '=', value_name],
                     ['attribute_id', '=', attribute_id]
                 ]
         )
+
+        if att_val_response.status_code in [200, 201]:
+            
+            self.att_values[attribute_name][value_name] = att_val_response.object
 
         return att_val_response
 
@@ -501,7 +552,7 @@ class ProductManager:
         }
 
     def create_product_template(
-            self, product_template: ProductTemplate, printer=True) -> None | Response | list:
+            self, product_template: ProductTemplate, printer = False) -> None | Response | list:
         """
         This creates a product at `product.product` and at `product.template`,
         and updates `product_template._id` inplace. It also appends all requirded
@@ -517,11 +568,20 @@ class ProductManager:
         Return:
             - creation_response: Response
         """
+
+        product_vals = product_template.export_to_dict()
+        for check_field in ['company_id', 'warehouse_id']:
+            if check_field in product_vals:
+                if product_vals[check_field] != 1:
+                    del product_vals[check_field]
+
         creation_response = self.client.create(
             PRODUCT.PRODUCT,
-            vals = product_template.export_to_dict(),
-            domains = product_template.domains
+            vals = product_vals,
+            domains = product_template.domains,
+            printer = printer
         )
+
         if printer:
             print(
                 product_template.name,
@@ -543,6 +603,39 @@ class ProductManager:
         error_log = []
         n = 0
 
+        correction_vals = {}
+        correction_response = None
+        correction_check = [
+           f"product_template.company_id != 1: {product_template.company_id != 1}",
+           f"product_template.warehouse_id != 1: {product_template.warehouse_id != 1}"
+        ]
+        if product_template.company_id != 1:
+            correction_vals['company_id'] = product_template.company_id
+        
+        if product_template.warehouse_id != 1:
+            correction_vals['warehouse_id'] = product_template.warehouse_id
+        
+        if printer:
+            for check in correction_check:
+                print(check)
+            print(f"{correction_vals=}: {len(correction_vals.keys())}")
+        
+        if len(correction_vals.keys()) > 0:
+            correction_response = self.client.update(
+                model = PRODUCT.TEMPLATE,
+                records_ids = [creation_response.object],
+                new_vals = correction_vals
+            )
+
+        if any(
+            [
+                product_template.attribute_values is None,
+                product_template.attribute_values_ids is None
+            ]
+        ):
+            
+            return creation_response
+        
         for (att_id, vals_ids) , (att_name, vals_names) in zip(
             product_template.attribute_values_ids.items(),
             product_template.attribute_values.items()
@@ -583,6 +676,18 @@ class ProductManager:
 
         if len(error_log)>0:
             return error_log
+        
+        if correction_response is not None:
+
+            if correction_response.status_code not in [200,201]:
+                creation_response.msg = "Succes on creating, Error while correcting: \n"
+                creation_response.msg += correction_response.msg
+                creation_response.status_code = 409
+                creation_response.status = 'Creation OK, Update FAILED'
+                creation_response.action = 'create -> update'
+        
+        return creation_response
+    
 
 
     def append_product_template_attribute_line(self, attribute_line: AttributeLine) -> Response:
@@ -624,6 +729,17 @@ class ProductManager:
                 ['attribute_id', '=', attribute_id]
             ],
             fields = ['id', 'name']
+        )
+
+    def update_product(self, template_id: int | list[int], vals:dict, printer=False) -> Response:
+        """
+        """
+ 
+        return self.client.update(
+            PRODUCT.PRODUCT,
+            records_ids = template_id,
+            new_vals = vals,
+            printer = printer
         )
     
     
@@ -776,7 +892,10 @@ class ProductManager:
         return pd.concat(products_received, ignore_index=True)
     
     def find_product(self,
-        template: str | int, attribute: str | int, value: str | int,
+        template: Optional[str | int] = None,
+        attribute: Optional[str | int] = None,
+        value: str | int = None,
+        by_id: Optional[int] = None,
         just_id = True, fields: Optional[list] = main_tmpl_att_val_fields,
         all_fields: bool = False
     ) -> list[int] | list[dict]:
@@ -801,7 +920,31 @@ class ProductManager:
             None explicitly. Assumes self.client methods handle exceptions.
         """
 
-
+        if by_id is not None:
+            if just_id:
+                return self.client.search(
+                    PRODUCT.PRODUCT,
+                    [
+                        ['id', '=', by_id]
+                    ]
+                )
+        
+            if all_fields:            
+                return self.client.search_read(
+                    PRODUCT.PRODUCT,
+                    [
+                        ['id', '=', by_id]
+                    ]
+                )
+            
+            return self.client.search_read(
+                    PRODUCT.PRODUCT,
+                    [
+                        ['id', '=', by_id]
+                    ],
+                    fields = fields
+                )
+        
         tmpl_att_val = self.client.search(
             PRODUCT.TEMPLATE_ATTRIBUTE_VALUE,
             domain = [

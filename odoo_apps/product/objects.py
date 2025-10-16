@@ -7,7 +7,7 @@ Stores all classes that can define:
 
 from dataclasses import dataclass#, fields, field
 import inspect
-from typing import Literal, Optional
+from typing import Literal, Optional, BinaryIO
 
 import numpy as np
 
@@ -34,8 +34,10 @@ class ColsReference:
 
     def __post_init__(self):
         if self.generate_from is None:
-            self.attributes = set(self.attributes)
-            self.drop = set(self.drop)
+            if self.attributes is not None:
+                self.attributes = set(self.attributes)
+            if self.attributes is not None:
+                self.drop = set(self.drop)
 
             if isinstance(self.renamer, (tuple, list)):
                 self.renamer = {
@@ -86,9 +88,10 @@ class ProductTemplate:
     name: str
     categ_id: str
     pos_categ_ids: Optional[list[int] | int] = None
+    public_categ_ids: Optional[list[int] | int] = None
     list_price: float | np.float32 | np.float64 = 0
     description: str | bool = False
-    barcode: Optional[str | bool] = False
+    barcode: Optional[str | int | bool] = False
     default_code: Optional[str | bool] = False
     qty_available: int = 0
     responsible_id: int = 2
@@ -97,9 +100,9 @@ class ProductTemplate:
     attribute_values: Optional[dict[str, list[str]]] = None
     attribute_values_ids: Optional[dict[int, list[int]]] = None
     attribute_lines: Optional[list[AttributeLine]] = None
-
+    standard_price: Optional[float] = None
     # allow_out_of_stock_order: bool = False
-    available_in_pos: bool = True
+    available_in_pos: bool = False
     # is_published: bool = False
     is_storable: bool = True
     sale_ok: bool = True
@@ -111,6 +114,18 @@ class ProductTemplate:
     fiscal_country_codes: str = 'MX'
     error_msg: Optional[str] = None
     _id: Optional[int] = None
+    image: Optional[BinaryIO] = False
+    image_128: Optional[BinaryIO] = False
+    image_256: Optional[BinaryIO] = False
+    image_512: Optional[BinaryIO] = False
+    image_1024: Optional[BinaryIO] = False
+    image_1920: Optional[BinaryIO] = False
+
+    company_id: Optional[int] = None
+    warehouse_id: Optional[int] = None
+    
+    property_account_income_id: Optional[int | str] = None
+    property_account_expense_id: Optional[int | str] = None
 # 'selection': [['consu', 'Goods'],
 #             ['service', 'Service'],
 #             ['combo', 'Combo']],
@@ -120,8 +135,6 @@ class ProductTemplate:
         else:
             # print('its float')
             self.list_price = float(self.list_price)
-        self.base_unit_price = self.list_price
-        self.standard_price = self.list_price
         
         if self.attribute_lines is None:
             self.attribute_lines = []
@@ -130,31 +143,34 @@ class ProductTemplate:
             ['categ_id', '=', self.categ_id]
         ]
 
-    def export_to_dict(self) -> dict:
+    def export_to_dict(self, drop: Optional[tuple] = ('domain', 'id', 'studio_fields')) -> dict:
         """
         Returns the dictionary version of the class
         """
-        members = inspect.getmembers(type(self))
-        base_dict = {
-            k: v for k,v in dict(members).items()\
-                if not k.startswith('__') and k != "export_to_dict"}
+        data = self.__dict__.copy()
         
-        base_dict['name'] = self.name
-        base_dict['categ_id'] = self.categ_id
-        base_dict['pos_categ_ids'] = self.pos_categ_ids
-        base_dict['description'] = self.description
-        base_dict['list_price'] = self.list_price
-        # base_dict['base_unit_price'] = self.list_price
-        base_dict['standard_price'] = self.list_price
+        if self.barcode:
+            if isinstance(self.barcode, int):
+                data['barcode'] = str(self.barcode)
+            if isinstance(self.barcode, str):
+                data['barcode'] = self.barcode
 
+        for cat in ['pos_categ_ids', 'public_categ_ids']:
+            # print(cat)
+            if cat in data:
+                if isinstance(data[cat], int):
+                    data[cat] = [data[cat]]
 
-        if isinstance(base_dict, int):
-            base_dict['pos_categ_ids'] = [base_dict['pos_categ_ids']]
+        data['type'] = data['_type']
 
-        base_dict['type'] = base_dict['_type']
-        if '_id' in base_dict:
-            if base_dict["_id"] is None:
-                del base_dict['_id']
+        if '_id' in data:
+            if data["_id"] is None:
+                del data['_id']
+
+        for key in data.keys():
+            if key.startswith('image'):
+                
+                data[key] = self.image
 
         for key in [
             '_type',
@@ -162,11 +178,23 @@ class ProductTemplate:
             'attribute_values_ids',
             'attribute_values',
             'error_msg',
-            'valid_product_template_attribute_line_ids'
+            'image',
+            'valid_product_template_attribute_line_ids',
+            'domains'
             ]:
-            del base_dict[key]
+            if key in data:
+                del data[key]
 
-        return base_dict
+        data_ref = data.copy()
+        for k, v in data_ref.items():
+            if str(v) in {'None', 'nan'}:
+                del data[k]
+
+        if drop is not None:
+            for field in drop:
+                if field in data:
+                    del data[field]
+        return data
 
 
 

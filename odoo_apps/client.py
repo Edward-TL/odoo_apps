@@ -193,8 +193,18 @@ class OdooClient:
             model = model
             )
         
+        # Confirms the existense of all given fields (trough vals) in Clients Odoo DB
+        # A set is used due to speed
+        avialable_fields = set(self.get_models_fields(model = model))
+        vals_check = vals.copy()
+
+        for field in vals_check:
+            if field not in avialable_fields:
+                del vals[field]
+        
         if hard:
             exists = False
+
         else:
             if domains is None:
                 domains = check_domains(
@@ -211,6 +221,7 @@ class OdooClient:
             if printer:
                 print("DOMAINS: ", domains)
                 print("Exist: ", exists)
+                pprint(f"{vals=}")
         
         if not exists:
             # print('Creando en', model, vals)
@@ -369,7 +380,8 @@ class OdooClient:
 
     def print_fields(
         self, model,
-        interest_fields: list | tuple = InterestFields, get_values=False
+        interest_fields: list | tuple = InterestFields, get_values=False,
+        help_data = False, get_interest_data = False, fields_ref = ['string', 'help', 'type']
     ) -> None | list:
         """
         Print fields from a model
@@ -380,7 +392,7 @@ class OdooClient:
         attribute_fields = self.get_models_fields(
             model,
             {
-                'attributes': ['string', 'help', 'type']
+                'attributes': fields_ref
                 }
                 )
         clean_fields = {}
@@ -396,8 +408,16 @@ class OdooClient:
             clean_fields
         )
 
+        if get_interest_data:
+            return clean_fields
+        
         if get_values:
             return list(clean_fields.keys())
+        
+        if help_data:
+            return {
+                k:v for k,v in clean_fields.items() if 'help' in v
+            }
 
 
 def create_models_file(

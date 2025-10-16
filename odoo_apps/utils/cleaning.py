@@ -258,3 +258,15 @@ def extract_cell_value(df: pd.DataFrame, col_ref: str, val_ref:str | int | float
     return df[df[col_ref] == val_ref][val_col].values[0]
     """
     return df[df[col_ref] == val_ref][val_col].values[0]
+
+def sort_dict(data: dict) -> dict:
+    """
+    Sorts a dictionary by its keys
+    """
+    sorted_data_items = sorted(data.items())
+
+    sorted_data = {
+        k: v for k,v in sorted_data_items
+    }
+
+    return sorted_data

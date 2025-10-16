@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from client import OdooClientServer
+from odoo_apps.client import OdooClient
 
 PROJECT_PATH = str(
     Path(__file__).resolve().parent.parent
@@ -19,7 +19,7 @@ DEFAULT_XLSX_FILE = f'{PROJECT_PATH}/{TABLES_DIR}/xodoo_tables.xlsx'
 
 
 def create_models_file(
-    client: OdooClientServer,
+    client: OdooClient,
     csv_file = DEFAULT_CSV_FILE,
     xlsx_file = DEFAULT_XLSX_FILE) -> None:
     """
@@ -73,4 +73,4 @@ def create_models_file(
 if __name__ == '__main__':
     print(PROJECT_PATH)
     print(DEFAULT_CSV_FILE)
-    print(DEFAULT_XLSX_FILE)
+    print(DEFAULT_XLSX_FILE) 
