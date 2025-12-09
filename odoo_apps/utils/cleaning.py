@@ -120,7 +120,7 @@ def check_domains(
 
 def transform_dict_array_to_dict(
         dict_array: list[dict],
-        key_ref: Literal['name', 'display_name'] = 'name',
+        key_ref: Literal['name', 'display_name'] = 'display_name',
         key_val: str = 'id') -> dict:
     """
     From a list of dictionaries, transform it to a single dictionary.

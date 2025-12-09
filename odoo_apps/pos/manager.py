@@ -1,26 +1,13 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Literal
-from copy import copy
-from pprint import pprint
-from xmlrpc.client import Fault
+from datetime import datetime, date, timedelta
 
-import pandas as pd
-from numpy import nan as np_nan
-
-from odoo_apps.client import OdooClient
+from odoo_apps.client import OdooClient, RPCHandlerMetaclass
 from odoo_apps.models import PRODUCT, POS
 from odoo_apps.response import Response
 
-from odoo_apps.type_hints.stock import DisplayTypes, CreateVariants
-from odoo_apps.utils.cleaning import (
-    transform_dict_array_to_dict,
-    merge_dictionaries,
-    gen_matrix,
-    split_id_pair
-    )
-
-from odoo_apps.product.objects import ProductTemplate, AttributeLine
-from odoo_apps.utils.cleaning import extract_cell_value
+from odoo_apps.product.manager import ProductManager
+from odoo_apps.utils.time_management import date_normalizer
 
 product_model = {
     'CATEGORY': PRODUCT.CATEGORY,
@@ -28,23 +15,23 @@ product_model = {
     'ATTRIBUTE': PRODUCT.ATTRIBUTE
 }
 
-def reference_clasifier(ref: list):
-    """
-    """
-    if len(ref) == 1:
-        return int(ref[0])
-    
-    if len(ref) == 0:
-        return np_nan
-    
-    return ref
-
 main_tmpl_att_val_fields = [
 'id', 'display_name', "product_template_variant_value_ids"
 ]
 
+GENERAL_PORPOUSE_POS_ORDER_LINE_FIELDS = (
+    'full_product_name', # Nombre del producto
+    'product_id',
+    'qty',
+    'product_uom_id',
+    'attribute_value_ids',
+    'create_date'
+)
+
+
+
 @dataclass
-class Pos:
+class PosManager(metaclass=RPCHandlerMetaclass):
     """
     Search for products store on Client's database.
     
@@ -57,28 +44,41 @@ class Pos:
     """
     client: OdooClient
     preload: bool = True
-    # Categories related
-    stocl_cat_col: str = None
-    categories: Optional[list | dict[str | int]] = None
-    
-    # Attributes_related
-    attributes: Optional[dict | list] = None
-    att_values: Optional[dict[str , list] | list | dict[str , dict]] = None
-    
-    # Templates related
-    templates: Optional[dict[str, dict]] = None
-    raw_templates_data: Optional[list[dict]] = None
-    template_attributes_value_matrix: Optional[dict[str, list] | pd.DataFrame] = None
-    
-    # Products related
-    products: Optional[dict[str, dict]] = None
-    raw_products_data: Optional[list[dict]] = None
-    products_matrix: Optional[dict[str, list] | pd.DataFrame] = None
+    prod_manager: Optional[ProductManager] = None
 
-    def get_all_categories(self) -> None:
+    def __post_init__(self):
+        if self.preload and self.prod_manager is None:
+            self.prod_manager = ProductManager(self.client, preload=self.preload)
+    
+    def day_sales(self,
+                  check_date: date | datetime | str,
+                  fields = GENERAL_PORPOUSE_POS_ORDER_LINE_FIELDS) -> list:
         """
-        Gets all categories stored on Odoo database, and stores it at `self.categories`
+        Returns the sales of the given date
+
+        It does not have a found way to call by ORDER, it's only by
+        ORDER_LINE
         """
-        self.categories = transform_dict_array_to_dict(
-                dict_array = self.get_all_values(PRODUCT.CATEGORY)
-            )
+        check_date = date_normalizer(check_date)
+        
+        model = POS.ORDER_LINE
+        
+        return self.client.search_read(
+            model,
+            domain = [
+                ['create_date', '>', check_date]
+            ],
+            fields = fields
+        )
+
+
+    def register_sale(self, sale_date: date | datetime, product: str | int, client: Optional[str | int]) -> Response:
+        ...
+    
+    def correct_sale(self, sale_id: str, sale_date: date | datetime, product: str | int, client: Optional[str | int]) -> Response:
+        ...
+
+    def cancel_sale(self, sale_id: str, sale_date: date | datetime, product: str | int, client: Optional[str | int]) -> Response:
+        ...
+
+    

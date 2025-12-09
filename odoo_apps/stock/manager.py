@@ -7,14 +7,14 @@ import pandas as pd
 from typing import Optional
 
 # from odoo_apps.utils.operators import Operator
-from odoo_apps.client import OdooClient
+from odoo_apps.client import OdooClient, RPCHandlerMetaclass
 from odoo_apps.response import Response
 from odoo_apps.models import PRODUCT, STOCK
 
 
 
 @dataclass
-class StockManager:
+class StockManager(metaclass=RPCHandlerMetaclass):
     """
     Inicializa el StockManager con un cliente de Odoo ya configurado.
 

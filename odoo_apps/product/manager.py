@@ -10,7 +10,7 @@ from xmlrpc.client import Fault
 import pandas as pd
 from numpy import nan as np_nan
 
-from odoo_apps.client import OdooClient
+from odoo_apps.client import OdooClient, RPCHandlerMetaclass
 from odoo_apps.models import PRODUCT, POS, STOCK
 from odoo_apps.response import Response
 
@@ -47,7 +47,7 @@ main_tmpl_att_val_fields = [
 ]
 
 @dataclass
-class ProductManager:
+class ProductManager(metaclass=RPCHandlerMetaclass):
     """
     Search for products store on Client's database.
     
@@ -178,6 +178,7 @@ class ProductManager:
                     'id',
                     'name',
                     'categ_id',
+                    'default_code',
                     'attribute_line_ids',
                     'valid_product_template_attribute_line_ids',
                     'product_variant_ids'
@@ -206,14 +207,16 @@ class ProductManager:
             if isinstance(self.products, list):
                 product_domain = ['name', 'in', self.products]
 
+            product_domain = [product_domain, ['active', '=', True]]
             print(f"{product_domain=}")
             self.raw_products_data = self.client.search_read(
                 PRODUCT.PRODUCT,
-                domain = [product_domain],
+                domain = product_domain,
                 fields = [
                     'id',
                     'categ_id',
                     'display_name',
+                    'default_code',
                     'product_tmpl_id',
                     'product_variant_id',
                     'product_template_variant_value_ids',
@@ -373,7 +376,7 @@ class ProductManager:
         """
         return self.client.search(product_model[module], domain)
     
-    def get_all_values(self, model:str, fields = ['id', 'name']) -> list[dict]:
+    def get_all_values(self, model:str, fields = ['id', 'display_name']) -> list[dict]:
         """
         Gets all values stored on Odoo's Database.
         Args:
@@ -390,7 +393,7 @@ class ProductManager:
             fields = fields
         )
     
-    def create_category(self, category_name: str, parent_id: int = False) -> Response:
+    def create_category(self, category_name: str, parent_id: Optional[int | bool] = None) -> Response:
         """
         Crea una nueva categoría de producto en Odoo.
 
@@ -407,7 +410,7 @@ class ProductManager:
         cat_domain = [
             ['name', '=', category_name]
         ]
-        if parent_id:
+        if parent_id is not None: # can be False
             category_data['parent_id'] = parent_id
             cat_domain.append(['parent_id', '=', parent_id])
 
@@ -422,7 +425,10 @@ class ProductManager:
 
         return category_response
 
-    def create_pos_category(self, category_name: str, parent_id: int = False) -> Response:
+    def create_pos_category(
+            self, category_name: str,
+            parent_id: Optional[int] = None,
+            hard = False) -> Response:
         """
         Crea una nueva categoría de producto en Odoo.
 
@@ -435,13 +441,21 @@ class ProductManager:
             int | False: El ID de la nueva categoría creada en Odoo, o False si hubo un error.
         """
         category_data = {
-            'name': category_name,
-            'parent_id': parent_id,
+            'name': category_name
         }
+        cat_domain = [
+            ['name', '=', category_name]
+        ]
+
+        if parent_id is not None:
+            category_data['parent_id'] = parent_id
+            cat_domain.append(['parent_id', '=', parent_id])
 
         category_response = self.client.create(
             model = POS.CATEGORY,
-            vals = category_data
+            vals = category_data,
+            domains = cat_domain,
+            hard = hard
         )
 
         if category_response.status_code in [200, 201]:
@@ -468,7 +482,7 @@ class ProductManager:
 
         if att_response.status_code in [200, 201]:
             self.attributes[name] = att_response.object
-        
+            self.att_values[name] = {}
         return att_response
 
     def append_attribute_value(
@@ -524,7 +538,9 @@ class ProductManager:
         )
 
         if att_val_response.status_code in [200, 201]:
-            
+            if attribute_name not in self.att_values:
+                self.att_values[attribute_name] = {}
+
             self.att_values[attribute_name][value_name] = att_val_response.object
 
         return att_val_response
@@ -675,7 +691,14 @@ class ProductManager:
             n += 1
 
         if len(error_log)>0:
-            return error_log
+            return Response(
+                action = 'create',
+                model = PRODUCT.PRODUCT,
+                msg = error_log,
+                object = None,
+                status = 'FAIL',
+                status_code = 400
+            )
         
         if correction_response is not None:
 
@@ -821,6 +844,28 @@ class ProductManager:
             col_name_of_new_values = "DISPONIBILIDAD"
         ) -> pd.DataFrame:
         """
+        Melts a product DataFrame to transform product-related columns into a more normalized format.
+
+        This function is typically used to reshape a DataFrame from a wide format (where product attributes
+        might be spread across multiple columns) to a long format, making it easier to analyze or
+        process product availability or other attribute-specific data.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame containing product data.
+            product (str): The specific product identifier to filter or process within the DataFrame.
+            product_col (str, optional): The name of the column in `df` that contains product template names.
+                                         Defaults to 'product_tmpl_name'.
+            melt_attribute_name (str, optional): The name of the attribute column that will be created
+                                                 after melting. Defaults to "TALLA" (Size).
+            col_name_of_new_values (str, optional): The name of the column that will hold the values
+                                                    corresponding to the `melt_attribute_name`.
+                                                    Defaults to "DISPONIBILIDAD" (Availability).
+
+        Returns:
+            pd.DataFrame: A new DataFrame that has been melted according to the specified parameters.
+                          The structure will typically include `product_col`, `melt_attribute_name`,
+                          and `col_name_of_new_values`.
+
 
         Args:
             - df: pd.DataFrame
@@ -1041,3 +1086,25 @@ class ProductManager:
             ]
 
         return enriched_product_variants    
+    
+    def archive_product(self, id: int | list, by: Literal['variant', 'template'] = 'variant') -> Response:
+        """
+        Archives, don't deletes, the product by variant or template
+        """
+        model = None
+        if by == 'variant':
+            model = PRODUCT.PRODUCT
+        elif by == 'template':
+            model = PRODUCT.TEMPLATE
+        else:
+            raise ValueError(f'Choose a `by` option. Received: {by=}')
+        
+        if isinstance(id, int):
+            id = [id]
+        print(model, [id])
+
+        return self.client.models.execute_kw(
+            self.client.db, self.client.uid, self.client.password,
+            # Yes, must be a nested list
+            model, 'action_archive', [id]
+        )

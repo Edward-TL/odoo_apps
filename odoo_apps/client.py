@@ -12,8 +12,10 @@ import io
 import re
 from pathlib import Path
 from dataclasses import dataclass
+import functools
 from typing import OrderedDict, Optional, Union
 import xmlrpc.client
+from xmlrpc.client import Fault
 from pprint import pprint
 
 import pandas as pd
@@ -35,8 +37,36 @@ DEFAULT_CSV_FILE = f'{PROJECT_PATH}/{TABLES_DIR}/odoo_tables.csv'
 DEFAULT_XLSX_FILE = f'{PROJECT_PATH}/{TABLES_DIR}/xodoo_tables.xlsx'
 
 
+def handle_xmlrpc_fault(func):
+    """
+    A decorator that catches xmlrpc.client.Fault, extracts the faultString,
+    and raises a new RuntimeError with the fault message.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Fault as e:
+            # Extract the faultString from the Fault object
+            fault_message = e.faultString
+            # Raise a new exception with the extracted message
+            raise RuntimeError(f"XML-RPC Fault: {fault_message}") from e
+        
+        except ConnectionError as e:
+            # Optionally, handle other xmlrpc-related errors like connection issues
+            raise RuntimeError(f"XML-RPC Connection Error: {e}") from e
+    
+    return wrapper
+
+class RPCHandlerMetaclass(type):
+    def __new__(mcs, name, bases, attrs):
+        for attr_name, attr_value in attrs.items():
+            if callable(attr_value) and not attr_name.startswith('__'):
+                attrs[attr_name] = handle_xmlrpc_fault(attr_value)
+        return super().__new__(mcs, name, bases, attrs)
+
 @dataclass
-class OdooClient:
+class OdooClient(metaclass=RPCHandlerMetaclass):
     """
     Odoo client server class to interact with Odoo XML-RPC API.
     """
@@ -67,7 +97,15 @@ class OdooClient:
             self.db = self.user_info['DB']
             self.username = self.user_info['USERNAME']
             self.password = self.user_info['PASSWORD']
+        
+        self.create_conection_with_server()
 
+
+    
+    def create_conection_with_server(self) -> xmlrpc.client.ServerProxy:
+        """
+        Creates the uid and models from Odoo ServerProxy Autentication
+        """
         common = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/common')
         self.uid = common.authenticate(self.db, self.username, self.password, {})
         self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
@@ -91,6 +129,24 @@ class OdooClient:
         #     request.model, request.action,
         #     [request.domains]
         # )
+
+
+    def execute_kw(self, model: str, kw: str, data: list | str | dict):
+        """
+        Executes kw on model
+        """
+        if not isinstance(data, list):
+            data = [data]
+        try:
+            return self.models.execute_kw(
+                self.db, self.uid, self.password,
+                model, kw,
+                data
+            )
+        except Fault as f:
+            fault = f.faultString
+            raise ConnectionError(fault)
+
 
     def read(self, model: str, ids: list[int], fields: list[str] = ['name']):
              #: ReadRequest):
@@ -197,10 +253,11 @@ class OdooClient:
         # A set is used due to speed
         avialable_fields = set(self.get_models_fields(model = model))
         vals_check = vals.copy()
-
-        for field in vals_check:
-            if field not in avialable_fields:
-                del vals[field]
+        
+        if hard is False:
+            for field in vals_check:
+                if field not in avialable_fields:
+                    del vals[field]
         
         if hard:
             exists = False
@@ -305,7 +362,7 @@ class OdooClient:
                 printer = printer
             )
             return response
-        
+    
 
     def delete(self,
         model: str,
@@ -378,10 +435,14 @@ class OdooClient:
             
         return fields_data
 
-    def print_fields(
+    def reference_field_data(
         self, model,
-        interest_fields: list | tuple = InterestFields, get_values=False,
-        help_data = False, get_interest_data = False, fields_ref = ['string', 'help', 'type']
+        interest_fields: list | tuple = InterestFields,
+        get_values=False,
+        help_data = False,
+        get_interest_data = False,
+        fields_ref = ['string', 'help', 'type'],
+        printer = True
     ) -> None | list:
         """
         Print fields from a model
@@ -404,9 +465,11 @@ class OdooClient:
             for k, v in props.items():
                 if k in interest_fields:
                     clean_fields[field][k] = v
-        pprint(
-            clean_fields
-        )
+        
+        if printer:
+            pprint(
+                clean_fields
+            )
 
         if get_interest_data:
             return clean_fields

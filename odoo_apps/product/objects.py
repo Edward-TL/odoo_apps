@@ -101,7 +101,7 @@ class ProductTemplate:
     attribute_values_ids: Optional[dict[int, list[int]]] = None
     attribute_lines: Optional[list[AttributeLine]] = None
     standard_price: Optional[float] = None
-    # allow_out_of_stock_order: bool = False
+    allow_out_of_stock_order: bool = False
     available_in_pos: bool = False
     # is_published: bool = False
     is_storable: bool = True

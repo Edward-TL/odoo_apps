@@ -614,3 +614,45 @@ class L10n:
     
 L10N = L10n()
 L10N.modules = L10N.export_to_dict()
+
+@dataclass
+class Manufactory:
+    """
+    MRP: Material Requirements Planning
+    BOM: Bill of Materials
+    """
+    ACCOUNT_WIP_ACCOUNTING = 'mrp.account.wip.accounting'
+    ACCOUNT_WIP_ACCOUNTING_LINE = 'mrp.account.wip.accounting.line'
+    BATCH_PRODUCE = 'mrp.batch.produce'
+    BOM_BYPRODUCT = 'mrp.bom.byproduct'
+    BOM_LINE = 'mrp.bom.line'
+    BOM = 'mrp.bom'
+    BILLS = 'mrp.bom'
+    MATERIAL_BILLS = 'mrp.bom'
+    CONSUMPTION_WARNING = 'mrp.consumption.warning'
+    CONSUMPTION_WARNING_LINE = 'mrp.consumption.warning.line'
+    PRODUCTION_BACKORDER = 'mrp.production.backorder'
+    PRODUCTION_BACKORDER_LINE = 'mrp.production.backorder.line'
+    PRODUCTION_SPLIT = 'mrp.production.split'
+    PRODUCTION_SPLIT_LINE = 'mrp.production.split.line'
+    PRODUCTION_SPLIT_MULTI = 'mrp.production.split.multi'
+    PRODUCTION = 'mrp.production'
+    REPORT = 'mrp.report'
+    ROUTING_WORKCENTER = 'mrp.routing.workcenter'
+    UNBUILD = 'mrp.unbuild'
+    WORKCENTER_CAPACITY = 'mrp.workcenter.capacity'
+    WORKCENTER_PRODUCTIVITY = 'mrp.workcenter.productivity'
+    WORKCENTER_PRODUCTIVITY_LOSS = 'mrp.workcenter.productivity.loss'
+    WORKCENTER_PRODUCTIVITY_LOSS_TYPE = 'mrp.workcenter.productivity.loss.type'
+    WORKCENTER_TAG = 'mrp.workcenter.tag'
+    WORKCENTER = 'mrp.workcenter'
+    WORKORDER = 'mrp.workorder'
+    ADDITIONAL_WORKORDER = 'mrp_production.additional.workorder'
+    modules = None
+    def export_to_dict(self):
+        return self.__dict__.copy()
+    
+MANUFACTORY = Manufactory()
+MANUFACTORY.modules = MANUFACTORY.export_to_dict()
+FACTORY = Manufactory()
+FACTORY.modules = FACTORY.export_to_dict()

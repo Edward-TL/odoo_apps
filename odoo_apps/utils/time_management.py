@@ -9,6 +9,45 @@ from .timezones import TzNames
 
 TIME_STR = "%Y-%m-%d %H:%M"
 DATE_STR = "%Y-%m-%d"
+
+from datetime import datetime, date
+
+def date_normalizer(date_value):
+    """
+    Converts a value  (date, datetime or str) to format 'YYYY-MM-DD HH:MM:SS'.
+    """
+    if isinstance(date_value, datetime):
+        return date_value.strftime("%Y-%m-%d %H:%M:%S")
+    
+    if isinstance(date_value, date):
+        # Convertimos agregando hora 00:00:00
+        return datetime(
+            date_value.year,
+            date_value.month,
+            date_value.day
+        ).strftime("%Y-%m-%d %H:%M:%S")
+    
+    if isinstance(date_value, str):
+        # Intentamos distintos formatos posibles
+        date_formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y %H:%M",
+            "%d/%m/%Y"
+        ]
+        for fmt in date_formats:
+            try:
+                dt = datetime.strptime(date_value, fmt)
+                return dt.strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+        raise ValueError(f"Not recognized date format: {date_value}")
+    
+    raise TypeError(f"Not supported type: {type(date_value)}")
+
+
 def standarize_datetime(
         dt: datetime | str,
         tz_str: TzNames = 'America/Mexico_City',

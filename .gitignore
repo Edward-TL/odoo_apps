@@ -176,3 +176,5 @@ helpers.py
 utils/helpers.py
 ./utils/helpers
 constants/
+*.csv
+*.xlsx

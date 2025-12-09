@@ -10,7 +10,7 @@ from typing import Optional
 
 from flask import Response as FlaskResponse
 
-from odoo_apps.client import OdooClient
+from odoo_apps.client import OdooClient, RPCHandlerMetaclass
 from odoo_apps.models import APPOINTMENT, CALENDAR
 from odoo_apps.response import (
     Response,
@@ -44,7 +44,7 @@ from .slots import(
 )
 
 @dataclass
-class AppointmentManager:
+class AppointmentManager(metaclass=RPCHandlerMetaclass):
     """
     Manages interactions with Odoo's appointment.appointment model via RPC.
     """

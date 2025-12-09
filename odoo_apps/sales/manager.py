@@ -1,23 +1,46 @@
 """
 """
 # from copy import copy
-from dataclasses import dataclass, field
-from typing import Optional, Literal
-from copy import copy
-from pprint import pprint
-from xmlrpc.client import Fault
-
-import pandas as pd
-from numpy import nan as np_nan
+from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Literal
 
 from odoo_apps.client import OdooClient
 from odoo_apps.models import SALES
 from odoo_apps.response import Response
 from odoo_apps.sales.objects import Quotation, QuotationLine, Invoice
+
 from odoo_apps.utils.multicompany import multicompany_correction, correction_error
+from odoo_apps.utils.time_management import date_normalizer
+
+GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS = (
+        'id',
+        'order_id',
+        'order_partner_id',
+        'salesman_id',
+        'product_id',
+        'product_template_id',
+        'display_name',
+        'product_qty',
+        'product_uom',
+        'product_uom_qty'
+)
+
+GENERAL_PORPOUSE_SALES_ORDER_FIELDS = (
+    'id',
+    'display_name',
+    'partner_id',
+    'amount_total',
+    'create_date',
+    'date_order',
+    'reference',
+    'note',
+    'user_id',
+    'amount_paid'
+)
 
 @dataclass
-class SalesManager:
+class SalesManager(metaclass=RPCHandlerMetaclass):
     """
     Search for products store on Client's database.
     
@@ -199,4 +222,28 @@ class SalesManager:
             SALES.ORDER,
             records_ids = quotation_line.id,
             new_vals = update_vals
+        )
+
+    def sales_of_the_day(
+            self,
+            check_date: date | datetime | str,
+            by: Literal['order_line', 'order'] = 'order_line',
+            fields = GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS) -> list:
+        """
+        Check all products sold for a 
+        """
+        
+        check_date = date_normalizer(check_date)
+
+        model = SALES.ORDER_LINE
+        if by == 'order':
+            model = SALES.ORDER
+            fields = GENERAL_PORPOUSE_SALES_ORDER_FIELDS
+
+        return self.client.search_read(
+            model,
+            domain = [
+                ['create_date', '>', check_date]
+            ],
+            fields =GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS
         )
