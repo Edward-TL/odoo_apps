@@ -3,7 +3,7 @@ from typing import Optional, Literal
 from copy import copy
 from pprint import pprint
 
-from odoo_apps.client import OdooClient
+from odoo_apps.client import OdooClient, RPCHandlerMetaclass
 from odoo_apps.models import ACCOUNT#, ACCOUNT_REPORTS
 from odoo_apps.response import Response
 
@@ -11,7 +11,7 @@ from odoo_apps.account.objects import Account
 
 
 @dataclass
-class AccountManager:
+class AccountManager(metaclass=RPCHandlerMetaclass):
     """
     Search for products store on Client's database.
     
