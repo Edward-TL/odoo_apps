@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
 
-from odoo_apps.client import OdooClient
+from odoo_apps.client import OdooClient, RPCHandlerMetaclass
 from odoo_apps.models import SALES
 from odoo_apps.response import Response
 from odoo_apps.sales.objects import Quotation, QuotationLine, Invoice
@@ -13,7 +13,7 @@ from odoo_apps.sales.objects import Quotation, QuotationLine, Invoice
 from odoo_apps.utils.multicompany import multicompany_correction, correction_error
 from odoo_apps.utils.time_management import date_normalizer
 
-GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS = (
+GENERAL_PURPOSE_SALES_ORDER_LINE_FIELDS = (
         'id',
         'order_id',
         'order_partner_id',
@@ -26,7 +26,7 @@ GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS = (
         'product_uom_qty'
 )
 
-GENERAL_PORPOUSE_SALES_ORDER_FIELDS = (
+GENERAL_PURPOSE_SALES_ORDER_FIELDS = (
     'id',
     'display_name',
     'partner_id',
@@ -96,7 +96,7 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
 
     def add_quotation_line(self, quotation: Quotation, quotation_line: QuotationLine) -> Response:
         """
-        Creates a quoation line to a given quatation.
+        Creates a quotation line to a given quotation.
         """
         vals = quotation_line.export_to_dict()
 
@@ -106,7 +106,6 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
             [key, '=', vals[key]] for key in domain_keys
         ]
 
-        # print(order_line_domain)
         resp = self.client.create(
             SALES.ORDER_LINE,
             vals = quotation_line.export_to_dict(),
@@ -125,74 +124,56 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
         """
         Updates state of given quotation to transform it into an Invoice
         """
-        # 2. Llamada al asistente para crear la factura
-        # El método 'sale.advance.payment.inv' es el asistente que Odoo usa para la creación de facturas.
-        # Creamos una instancia de este asistente en el contexto de nuestra orden de venta.
+        # 1. Prepare context for the wizard
         context = {
             'active_model': 'sale.order',
             'active_ids': [quotation.id],
             'active_id': quotation.id,
         }
         
-        wizard_id = self.client.models.execute_kw(
-            self.client.db, self.client.uid, self.client.password,
+        # 2. Create the invoicing wizard
+        wizard_id = self.client.execute_kw(
             'sale.advance.payment.inv', 'create',
-            # Opción para facturar lo entregado (líneas facturables)
+            # Option to invoice what is delivered
             [{'advance_payment_method': 'delivered'}]
             , {'context': context}
         )
         
-        # logging.info(f"Asistente de facturación creado con ID: {wizard_id}")
-
-        # 3. Ejecutar la acción del asistente para crear la factura final
-        # Este método crea la factura borrador y devuelve la acción para abrir su vista.
+        # 3. Execute the action to create the final invoice
         action = self.client.models.execute_kw(
             self.client.db, self.client.uid, self.client.password,
             'sale.advance.payment.inv', 'create_invoices',
             [wizard_id], {'context': context}
         )
 
-        # 4. Extraer el ID de la factura creada desde la acción devuelta
-        if action and action.get('res_id'):
-            invoice_id = action.get('res_id')
-            # logging.info(f"ÉXITO: Factura borrador creada con ID: {invoice_id} para la Orden de Venta ID: {order_id}")
-            return invoice_id
+        # 4. Extract the created invoice ID from the returned action
+        if action and isinstance(action, dict) and action.get('res_id'):
+            return action.get('res_id')
 
-        # Si no se devuelve un res_id, podemos buscar la factura en la orden de venta.
+        # Fallback: search for the invoice in the sales order
         order_data = self.client.models.execute_kw(
             self.client.db, self.client.uid, self.client.password,
             'sale.order', 'read',
             [quotation.id], {'fields': ['invoice_ids']}
         )
+        
         if order_data and order_data[0]['invoice_ids']:
-            # Tomamos la última factura creada
-            invoice_id = order_data[0]['invoice_ids'][-1]
-            # logging.info(f"ÉXITO (vía lectura): Factura borrador creada con ID: {invoice_id} para la Orden de Venta ID: {order_id}")
-            return invoice_id
-        else:
-            # logging.error("No se pudo confirmar la creación de la factura. La acción no devolvió un ID.")
-            return None
+            # Take the last created invoice
+            return order_data[0]['invoice_ids'][-1]
+        
+        return None
 
 
     def confirm_sale_order(self, quotation: Quotation) -> Response:
         """
-        By confirming the given quotation, converts it to a sales order
+        By confirming the given quotation, converts it to a sales order.
+        This automatically generates the invoice in draft state if the product is configured for it.
         """
-        # --- PASO 3: Confirmar la Cotización para convertirla en Orden de Venta ---
-        # Esto automáticamente generará la factura en estado borrador
-        # si el producto está configurado para ello.
-
-        # Still missing a way to create a log for the managers.
-        # log_msg = f"Quotation ID: {order_id} CONFIRMED."
-        # log_msg += "Odoo should generate the corresponding invoice"
-        # logging.info(log_msg)
-
-        return self.client.models.execute_kw(
-            self.client.db, self.client.uid, self.client.password,
+        return self.client.execute_kw(
             SALES.ORDER,
             'action_confirm',
             [quotation.id]
-            )
+        )
 
     def delete_quotation(self, quotation: Quotation) -> Response:
         """
@@ -204,9 +185,9 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
             ids = quotation.id
         )
 
-    def update_quation(self, quotation: Quotation, update_vals: dict) -> Response:
+    def update_quotation(self, quotation: Quotation, update_vals: dict) -> Response:
         """
-        Updates quatation data
+        Updates quotation data
         """
         return self.client.update(
             SALES.ORDER,
@@ -216,7 +197,7 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
 
     def update_quotation_line(self, quotation_line: QuotationLine, update_vals: dict) -> Response:
         """
-        Updates quatation data
+        Updates quotation line data
         """
         return self.client.update(
             SALES.ORDER,
@@ -228,9 +209,9 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
             self,
             check_date: date | datetime | str,
             by: Literal['order_line', 'order'] = 'order_line',
-            fields = GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS) -> list:
+            fields = GENERAL_PURPOSE_SALES_ORDER_LINE_FIELDS) -> list:
         """
-        Check all products sold for a 
+        Check all products sold for a given date.
         """
         
         check_date = date_normalizer(check_date)
@@ -238,12 +219,12 @@ class SalesManager(metaclass=RPCHandlerMetaclass):
         model = SALES.ORDER_LINE
         if by == 'order':
             model = SALES.ORDER
-            fields = GENERAL_PORPOUSE_SALES_ORDER_FIELDS
+            fields = GENERAL_PURPOSE_SALES_ORDER_FIELDS
 
         return self.client.search_read(
             model,
             domain = [
                 ['create_date', '>', check_date]
             ],
-            fields =GENERAL_PORPOUSE_SALES_ORDER_LINE_FIELDS
+            fields =GENERAL_PURPOSE_SALES_ORDER_LINE_FIELDS
         )
