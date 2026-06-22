@@ -100,7 +100,7 @@ class ReadRequest:
     model: str
     ids: list[int]
     action = 'read'
-    fields: list[str] = field(default_factory = ['name'])
+    fields: list[str] = field(default_factory = lambda: ['name'])
 
 @dataclass
 class SearchReadRequest:
@@ -119,7 +119,7 @@ class SearchReadRequest:
 
     model: str
     domain: Optional[ list[tuple[str,str,str]] ] = None
-    fields: list[str] = field(default_factory = ['name'])
+    fields: list[str] = field(default_factory = lambda: ['name'])
     action = 'search_read'
     limit: Optional[int] = None
     order: Optional[str] = None

@@ -131,7 +131,15 @@ class Bom:
         data = self.__dict__.copy()
         if drop is not None:
             for field in drop:
-                del data[field]
+                if field in data:
+                    del data[field]
+
+        # Quitar valores None: el XML-RPC de Odoo (allow_none=False) no los
+        # serializa y abortaría el create (p. ej. product_id/sequence sin valor).
+        data_ref = data.copy()
+        for k, v in data_ref.items():
+            if v is None:
+                del data[k]
 
         return sort_dict(data)
     
@@ -174,7 +182,7 @@ class BomLine:
     parent_product_tmpl_id: int = 81 # Camisola SEUT
 
     # display_name: str = 'Tela de gabardina'
-    product_uom_id: int
+    product_uom_id: Optional[int] = None
     allowed_uom_ids: Optional[list] = False
     possible_bom_product_template_attribute_value_ids: Optional[list] = False
     bom_product_template_attribute_value_ids: Optional[list] = False
@@ -192,7 +200,7 @@ class BomLine:
     #     - `none` -> `By Quantity`
 
     company_id: int = 1
-    id: Optional[int]
+    id: Optional[int] = None
 
     def __post_init__(self):
         if self.id is None:
@@ -220,7 +228,15 @@ class BomLine:
         data = self.__dict__.copy()
         if drop is not None:
             for field in drop:
-                del data[field]
+                if field in data:
+                    del data[field]
+
+        # Quitar valores None: el XML-RPC de Odoo (allow_none=False) no los
+        # serializa y abortaría el create (p. ej. product_id/sequence sin valor).
+        data_ref = data.copy()
+        for k, v in data_ref.items():
+            if v is None:
+                del data[k]
 
         return sort_dict(data)
 
@@ -515,6 +531,14 @@ class ProductionOrder:
         data = self.__dict__.copy()
         if drop is not None:
             for field in drop:
-                del data[field]
+                if field in data:
+                    del data[field]
+
+        # Quitar valores None: el XML-RPC de Odoo (allow_none=False) no los
+        # serializa y abortaría el create (p. ej. product_id/sequence sin valor).
+        data_ref = data.copy()
+        for k, v in data_ref.items():
+            if v is None:
+                del data[k]
 
         return sort_dict(data)

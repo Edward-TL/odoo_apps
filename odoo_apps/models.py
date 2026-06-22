@@ -329,7 +329,8 @@ class Pos:
     SESSION = 'pos.session'
     DISPLAY = 'pos_preparation_display.display'
     ORDER_STAGE = 'pos_preparation_display.order.stage'
-    ORDER = 'pos_preparation_display.order'
+    # NOTE: do NOT name this `ORDER` — it would shadow `ORDER = 'pos.order'` above.
+    PREPARATION_ORDER = 'pos_preparation_display.order'
     ORDERLINE = 'pos_preparation_display.orderline'
     RESET_WIZARD = 'pos_preparation_display.reset.wizard'
     STAGE = 'pos_preparation_display.stage'
@@ -571,6 +572,32 @@ class Sales:
     
 SALES = Sales()
 SALES.modules = SALES.export_to_dict()
+
+@dataclass
+class Crm:
+    """
+    CRM (Customer Relationship Management) Tables
+    """
+    _name = 'crm'
+    LEAD = 'crm.lead'
+    LEAD_SCORING_FREQUENCY = 'crm.lead.scoring.frequency'
+    LOST_REASON = 'crm.lost.reason'
+    RECURRING_PLAN = 'crm.recurring.plan'
+    STAGE = 'crm.stage'
+    TAG = 'crm.tag'
+    TEAM = 'crm.team'
+    TEAM_MEMBER = 'crm.team.member'
+    ACTIVITY_REPORT = 'crm.activity.report'
+
+    def __post_init__(self):
+        self.modules = generate_dict(self)
+        self.members = inspect.getmembers(type(self))
+        self.fields = {k: v for k,v in dict(self.members).items() if not k.startswith('__')}
+
+    def __str__(self):
+        return string_class(self)
+
+CRM = Crm()
 
 @dataclass
 class L10n:

@@ -8,21 +8,21 @@ It uses the xmlrpc.client library to communicate with the Odoo server.
 Author: EdwardTL
 """
 import csv
+import functools
 import io
 import re
-from pathlib import Path
-from dataclasses import dataclass
-import functools
-from typing import OrderedDict, Optional, Union
 import xmlrpc.client
-from xmlrpc.client import Fault
+from dataclasses import dataclass
+from pathlib import Path
 from pprint import pprint
+from typing import Optional, OrderedDict, Union
+from xmlrpc.client import Fault
 
 import pandas as pd
 
+from .response import Response
 from .utils.cleaning import check_domains
 from .utils.operators import Operator
-from .response import Response
 
 InterestFields = tuple(['string', 'help', 'type', 'selection'])
 
@@ -51,11 +51,11 @@ def handle_xmlrpc_fault(func):
             fault_message = e.faultString
             # Raise a new exception with the extracted message
             raise RuntimeError(f"XML-RPC Fault: {fault_message}") from e
-        
+
         except ConnectionError as e:
             # Optionally, handle other xmlrpc-related errors like connection issues
             raise RuntimeError(f"XML-RPC Connection Error: {e}") from e
-    
+
     return wrapper
 
 class RPCHandlerMetaclass(type):
@@ -97,18 +97,34 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
             self.db = self.user_info['DB']
             self.username = self.user_info['USERNAME']
             self.password = self.user_info['PASSWORD']
-        
+
         self.create_conection_with_server()
 
 
-    
-    def create_conection_with_server(self) -> xmlrpc.client.ServerProxy:
+
+    def create_conection_with_server(self) -> None:
         """
         Creates the uid and models from Odoo ServerProxy Autentication
         """
-        common = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/common')
+        if not self.url:
+            raise ValueError("No Odoo URL was provided.")
+        # Avoid a double slash (e.g. 'https://host//xmlrpc/...') when the
+        # configured URL already ends with '/'.
+        base_url = self.url.rstrip('/')
+        common = xmlrpc.client.ServerProxy(f'{base_url}/xmlrpc/2/common')
         self.uid = common.authenticate(self.db, self.username, self.password, {})
-        self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
+        if not self.uid:
+            # Odoo's `authenticate` returns False (it does not raise) when the
+            # credentials are rejected. Surface a clear error here instead of
+            # letting the next call fail with a misleading "Access Denied".
+            raise RuntimeError(
+                "Odoo authentication failed (uid is False). Check the values in "
+                "your .env: DB name, USERNAME (on hosted Odoo this is your login "
+                "email, not 'admin'), and PASSWORD. On Odoo 14+ / hosted "
+                "instances use an API Key as the PASSWORD "
+                "(Preferences > Account Security > New API Key)."
+            )
+        self.models = xmlrpc.client.ServerProxy(f'{base_url}/xmlrpc/2/object')
 
     def search(self, model: str, domain: list[tuple[str,str,str]]) -> list[int]:
         #request: SearchRequest):
@@ -145,12 +161,10 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
             )
         except Fault as f:
             fault = f.faultString
-            raise ConnectionError(fault)
+            raise ConnectionError(fault) from f
 
 
-    def read(self, model: str, ids: list[int], fields: list[str] = ['name']):
-             #: ReadRequest):
-    # model: str, ids: list[int], fields: list[str]):
+    def read(self, model: str, ids: list[int], fields: Optional[list[str]] = None):
         '''
         Read records from the specified model.
         :param model: The name of the model to read from.
@@ -158,6 +172,8 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
         :param fields: A list of field names to retrieve.
         :return: A list of dictionaries representing the records.
         '''
+        if fields is None:
+            fields = ['name']
 
         # data = models.execute_kw(
         #           db, uid, password, 'res.partner', 'read',
@@ -177,12 +193,11 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
 
     def search_read(self,
             model: str,
-            domain: list[tuple[str,str,str]] = [('id', '>', 0)],
+            domain: Optional[list[tuple[str, str, str]] | list[tuple[str, str, int]]] = None,
             fields: Optional[list[str]] = None,
             limit: Optional[int] = None,
             order: Optional[str] = None
-        ):#request: SearchReadRequest):
-        # domain: list[tuple[str, str, str]] = None, fields: list[str] = None):
+        ):
         '''
         Search and read records from the specified model.
             - model (str): The name of the Odoo model to query.
@@ -197,9 +212,11 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
         #     [[('customer_rank', '>', 0)]],
         #     {'fields': ['name', 'phone'], 'limit': 10, 'order': 'name asc'}
         # )
+        if domain is None:
+            domain = [('id', '>', 0)]
         if fields is None:
             fields = self.get_models_fields(model)
-            
+
         query_structure = {'fields': fields}
 
         if limit is not None:
@@ -233,8 +250,9 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
                 If the field is a date(time) field, you can also specify a part of the date using
                 'field_name.granularity'. The supported granularities are 'year_number',
                 'quarter_number', 'month_number', 'iso_week_number', 'day_of_week', 'day_of_month',
-                'day_of_year', 'hour_number', 'minute_number', 'second_number'. They all use an integer as value.
-                
+                'day_of_year', 'hour_number', 'minute_number', 'second_number'.
+                They all use an integer as value.
+
                 Defaults to 'name'.
             - domain_comp (Operator | list[Operator], optional): Comparison operator(s)
                 for domain checking. Defaults to '='.
@@ -248,17 +266,17 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
             action = 'create',
             model = model
             )
-        
+
         # Confirms the existense of all given fields (trough vals) in Clients Odoo DB
         # A set is used due to speed
         avialable_fields = set(self.get_models_fields(model = model))
         vals_check = vals.copy()
-        
+
         if hard is False:
             for field in vals_check:
                 if field not in avialable_fields:
                     del vals[field]
-        
+
         if hard:
             exists = False
 
@@ -274,12 +292,12 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
                 model = model,
                 domain = domains
             )
-            
+
             if printer:
                 print("DOMAINS: ", domains)
                 print("Exist: ", exists)
                 pprint(f"{vals=}")
-        
+
         if not exists:
             # print('Creando en', model, vals)
             try:
@@ -304,12 +322,9 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
                     printer = printer
                 )
                 return response
-        
+
         # IF EXISTS
-        if isinstance(exists,list):
-            object_id = exists[0]
-        else:
-            object_id = exists
+        object_id = exists[0] if isinstance(exists, list) else exists
 
         response.complete_response(
             obj_id = object_id,
@@ -354,6 +369,19 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
                     )
                 return response
 
+            # `write` returned a falsy value without raising: surface it as a
+            # failure instead of silently returning None.
+            response.complete_response(
+                obj_id = False,
+                status = 406,
+                msg = (
+                    f"Odoo 'write' returned {object_vals!r} for IDs "
+                    f"{records_ids} on model '{model}' (no records updated)."
+                ),
+                printer = printer
+            )
+            return response
+
         except Exception as e:
             response.complete_response(
                 obj_id = False,
@@ -362,7 +390,7 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
                 printer = printer
             )
             return response
-    
+
 
     def delete(self,
         model: str,
@@ -422,7 +450,7 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
         :return: A dictionary of field names and their corresponding attributes.
         '''
         # fields_info = models.execute_kw(
-        #   db, uid, password, 'res.partner', 'fields_get', [], 
+        #   db, uid, password, 'res.partner', 'fields_get', [],
         # {'attributes': ['string', 'type']}
         #)
         fields_data = self.models.execute_kw(
@@ -430,9 +458,9 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
             model, 'fields_get', []
             )
         if not attributes:
-            fields = [field for field in fields_data.keys()]
+            fields = list(fields_data.keys())
             return tuple(fields)
-            
+
         return fields_data
 
     def reference_field_data(
@@ -441,7 +469,7 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
         get_values=False,
         help_data = False,
         get_interest_data = False,
-        fields_ref = ['string', 'help', 'type'],
+        fields_ref: Optional[list[str]] = None,
         printer = True
     ) -> None | list:
         """
@@ -450,6 +478,8 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
         :param fields: Fields to get
         :return: Dictionary of fields
         """
+        if fields_ref is None:
+            fields_ref = ['string', 'help', 'type']
         attribute_fields = self.get_models_fields(
             model,
             {
@@ -465,7 +495,7 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
             for k, v in props.items():
                 if k in interest_fields:
                     clean_fields[field][k] = v
-        
+
         if printer:
             pprint(
                 clean_fields
@@ -473,10 +503,10 @@ class OdooClient(metaclass=RPCHandlerMetaclass):
 
         if get_interest_data:
             return clean_fields
-        
+
         if get_values:
             return list(clean_fields.keys())
-        
+
         if help_data:
             return {
                 k:v for k,v in clean_fields.items() if 'help' in v
@@ -493,44 +523,43 @@ def create_models_file(
     :return: None
     """
 
-    odoo_tables_file = open(csv_file, 'w', encoding='utf-8')
-    writer = csv.writer(odoo_tables_file)
-    writer.writerow(['app', 'module', 'component', 'model_name', 'description'])
-
     models_info = self.search_read("ir.model", fields = ['model', 'name', 'info'])
 
-    for model_info in models_info:
-        model_name = model_info.get('model', 'N/A')
-        # Odoo nombra las tablas de la base de datos a partir del nombre técnico del modelo,
-        # reemplazando los puntos por guiones bajos.
-        # Ej: res.partner -> res_partner
-        model_comp = model_name.split('.')
-        app = model_comp[0]
-        if len(model_comp) == 1:
-            module = ''
-            component = ''
-        elif len(model_comp) == 2:
-            module = model_comp[1]
-            component = ''
-        else:
-            module = model_comp[1]
-            component = '.'.join(model_comp[2:])
+    with open(csv_file, 'w', encoding='utf-8') as odoo_tables_file:
+        writer = csv.writer(odoo_tables_file)
+        writer.writerow(['app', 'module', 'component', 'model_name', 'description'])
 
-        # table_name = model_name.replace('.', '_') if model_name != 'N/A' else 'N/A'
+        for model_info in models_info:
+            model_name = model_info.get('model', 'N/A')
+            # Odoo nombra las tablas de la base de datos a partir del nombre técnico
+            # del modelo, reemplazando los puntos por guiones bajos.
+            # Ej: res.partner -> res_partner
+            model_comp = model_name.split('.')
+            app = model_comp[0]
+            if len(model_comp) == 1:
+                module = ''
+                component = ''
+            elif len(model_comp) == 2:
+                module = model_comp[1]
+                component = ''
+            else:
+                module = model_comp[1]
+                component = '.'.join(model_comp[2:])
 
-        description = model_info.get('name', 'Sin descripción') # 'name' es el nombre visible
-        # 'info' a veces contiene una descripción más detallada, podemos usarla si está disponible
-        detailed_info = model_info.get('info', '').strip()
-        if detailed_info:
-            description += f" ({detailed_info})"
+            # 'name' es el nombre visible
+            description = model_info.get('name', 'Sin descripción')
+            # 'info' a veces contiene una descripción más detallada, si está disponible
+            detailed_info = model_info.get('info', '').strip()
+            if detailed_info:
+                description += f" ({detailed_info})"
 
-
-        # Limpiar la descripción para evitar problemas con caracteres especiales en CSV
-        description = description.replace('"', '""').replace('\n', ' ').replace('\r', '')
-        description = re.sub(r'\s+', ' ', description)  # Eliminar espacios adicionales
-        description = re.sub(r'=+', ' ', description)  # Eliminar espacios adicionales
-        writer.writerow([app, module, component, model_name, description])
-
-    odoo_tables_file.close()
+            # Limpiar la descripción para evitar problemas con caracteres en CSV
+            description = (
+                description.replace('"', '""').replace('\n', ' ').replace('\r', '')
+            )
+            # Eliminar espacios y signos de igual adicionales
+            description = re.sub(r'\s+', ' ', description)
+            description = re.sub(r'=+', ' ', description)
+            writer.writerow([app, module, component, model_name, description])
 
     pd.read_csv(csv_file, encoding='utf-8').to_excel(xlsx_file, index=False)

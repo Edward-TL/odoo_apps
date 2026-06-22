@@ -28,18 +28,6 @@ class StockManager(metaclass=RPCHandlerMetaclass):
     internal_stock_id: Optional[int] = None
 
     def __post_init__(self):
-        print([
-                self.picking_type_id is not None,
-                self.location_src_id is not None,
-                self.location_dest_id is not  None
-                ])
-        print(all(
-            [
-                self.picking_type_id is not None,
-                self.location_src_id is not None,
-                self.location_dest_id is not  None
-                ]
-        ))
         if self.internal_stock_id is None:
             self.internal_stock_id = self.client.search(
                 STOCK.LOCATION,
@@ -56,7 +44,6 @@ class StockManager(metaclass=RPCHandlerMetaclass):
                 self.location_dest_id is not  None
                 ]) is False:
 
-            print('buscando info')
             picking_type = self.client.search_read(
                 STOCK.PICKING_TYPE,
                 [
@@ -107,8 +94,13 @@ class StockManager(metaclass=RPCHandlerMetaclass):
     
     def create_picking_order(self, picking_lines: list) -> Response:
         """
-        """
+        Create an incoming `stock.picking` from the given move lines and confirm
+        it via the `action_confirm` server action.
 
+        Returns the creation `Response`. If creation itself failed the response
+        is returned untouched; if creation succeeded but confirmation failed,
+        the Response is downgraded to a 406 with an explanatory message.
+        """
         picking_response = self.client.create(
             STOCK.PICKING,
             vals = [
@@ -121,22 +113,28 @@ class StockManager(metaclass=RPCHandlerMetaclass):
             ],
             hard = True
         )
-        picking_id = picking_response.object
-        if picking_response.status_code == 200:
-            print(f"📦 Recibo de inventario CREADO CON ÉXITO. ID: {picking_id}")
-        elif picking_response.status_code == 201:
-            print(f"📦 Recibo de inventario ENCONTRADO. ID: {picking_id}")
-        else:
-            print(f"❌ Ocurrió un error: {picking_response.msg}")
 
-        if picking_response.status_code in [200, 201]:
-            action_confirm = self.client.models.execute_kw(
-                self.client.db, self.client.uid, self.client.password,
-                'stock.picking', 'action_confirm', [picking_id]
+        # Creation failed (neither found nor created): nothing to confirm.
+        if picking_response.status_code not in (200, 201):
+            return picking_response
+
+        picking_id = picking_response.object
+        action_confirm = self.client.models.execute_kw(
+            self.client.db, self.client.uid, self.client.password,
+            STOCK.PICKING, 'action_confirm', [picking_id]
+        )
+
+        if not action_confirm:
+            picking_response.complete_response(
+                obj_id = picking_id,
+                status = 406,
+                msg = (
+                    f"Picking {picking_id} was created but 'action_confirm' "
+                    f"failed (returned {action_confirm!r})."
                 )
-            
-            if not action_confirm:
-                print("Problemas al momento de confirmar la orden", picking_id)
+            )
+
+        return picking_response
         
 
 

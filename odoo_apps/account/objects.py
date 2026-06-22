@@ -209,3 +209,113 @@ class Account:
                 del data[field]
 
         return sort_dict(data)
+
+
+MoveType = Literal[
+    'entry',
+    'out_invoice',   # Customer Invoice ("nota"/factura de venta)
+    'out_refund',    # Customer Credit Note
+    'in_invoice',    # Vendor Bill
+    'in_refund',     # Vendor Credit Note
+]
+
+
+@dataclass
+class InvoiceLine:
+    """
+    A single line of a customer invoice (`account.move.line` of an invoice).
+
+    `product_id`: [many2one] Invoiced product.
+    `name`: [char] Line description / label.
+    `quantity`: [float] Quantity.
+    `price_unit`: [float] Unit price. When taxes are *price-included*, this is the
+        final price shown to the customer.
+    `tax_ids`: [many2many] List of `account.tax` ids (plain ints, converted to the
+        Odoo `(6, 0, ids)` command on export).
+    `discount`: [float] Discount (%) over the line.
+    """
+    product_id: int
+    name: Optional[str] = False
+    quantity: float = 1.0
+    price_unit: float = 0.0
+    tax_ids: Optional[list[int]] = None
+    discount: float = 0.0
+
+    def export_to_dict(self) -> dict:
+        """Returns the line as an Odoo write-command-ready dict."""
+        data = {
+            'product_id': self.product_id,
+            'quantity': self.quantity,
+            'price_unit': self.price_unit,
+            'discount': self.discount,
+        }
+        if self.name:
+            data['name'] = self.name
+        if self.tax_ids:
+            data['tax_ids'] = [(6, 0, list(self.tax_ids))]
+        return data
+
+
+@dataclass
+class Invoice:
+    """
+    A customer invoice ("nota" / factura de venta) = `account.move` with
+    `move_type='out_invoice'`.
+
+    `partner_id`: [many2one] Customer (`res.partner`).
+    `invoice_date`: [date] Invoice date ('YYYY-MM-DD').
+    `invoice_line_ids`: list of `InvoiceLine` (converted to `(0, 0, {...})` on export).
+    `ref`: [char] External reference. Used for idempotent create (domain on `ref`).
+    `move_type`: [selection] Defaults to 'out_invoice'.
+    `currency_id`: [many2one] Currency (33 = MXN).
+    `invoice_date_due`: [date] Due date.
+    `journal_id`: [many2one] Sales journal. If None, Odoo picks the default.
+    """
+    partner_id: int
+    invoice_line_ids: list  # list[InvoiceLine]
+    ref: str
+    invoice_date: Optional[str] = None
+    invoice_date_due: Optional[str] = None
+    move_type: MoveType = 'out_invoice'
+    currency_id: int = 33  # MXN
+    journal_id: Optional[int] = None
+    company_id: Optional[int] = None
+    id: Optional[int] = None
+
+    def __post_init__(self):
+        self.domain = [
+            ['ref', '=', self.ref],
+            ['move_type', '=', self.move_type],
+        ]
+
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value)
+        if name == 'id' and value is not None:
+            self.domain = [
+                ['id', '=', self.id]
+            ]
+
+    def export_to_dict(self, drop: Optional[tuple] = ('domain', 'id', 'studio_fields')) -> dict:
+        """
+        Returns the dictionary version of the class, translating `invoice_line_ids`
+        (a list of `InvoiceLine`) into Odoo `(0, 0, {...})` create commands and
+        dropping empty values.
+        """
+        data = self.__dict__.copy()
+        if drop is not None:
+            for field in drop:
+                if field in data:
+                    del data[field]
+
+        data['invoice_line_ids'] = [
+            (0, 0, line.export_to_dict()) for line in self.invoice_line_ids
+        ]
+
+        data_ref = data.copy()
+        for k, v in data_ref.items():
+            if k == 'invoice_line_ids':
+                continue
+            if v is None or str(v) == 'nan':
+                del data[k]
+
+        return sort_dict(data)
