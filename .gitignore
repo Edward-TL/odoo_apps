@@ -178,3 +178,5 @@ utils/helpers.py
 constants/
 *.csv
 *.xlsx
+.claude/
+.github/
