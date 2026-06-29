@@ -1,11 +1,10 @@
 """
 Standard response
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal, Union, Optional
-from flask import Flask, make_response
-from flask import Response as FlaskResponse
 
 from .request import (
     SearchRequest,
@@ -156,10 +155,16 @@ def report_fail(
         msg = msg
     )
 
-def standarize_response(request: Request, response: Response) -> FlaskResponse:
+def standarize_response(request: Request, response: Response) -> "FlaskResponse":
     """
     Function to simplifys the reponse generation
     """
+    # Imported lazily so the rest of this module (the ``Response`` dataclass used
+    # by every RPC call) can be imported in environments without Flask — e.g. the
+    # in-process loader running inside the Odoo container (where pulling Flask in
+    # would risk clashing with Odoo's pinned Werkzeug).
+    from flask import Flask, make_response
+
     app = Flask(__name__)
     response_status = int(response.status_code)
 

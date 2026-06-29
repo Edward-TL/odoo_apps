@@ -2,13 +2,16 @@
 Helper functions to keep code cleaner
 """
 # from pprint import pprint
+from __future__ import annotations
+
 from copy import copy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import re
-from typing import Literal, Optional
+from typing import Literal, Optional, TYPE_CHECKING
 
-from flask import Response as FlaskResponse
+if TYPE_CHECKING:  # FlaskResponse used only in annotations (PEP 563) — not needed at runtime
+    from flask import Response as FlaskResponse
 
 # from odoo_apps.client import OdooClient
 from odoo_apps.models import CALENDAR#, APPOINTMENT
