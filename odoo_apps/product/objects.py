@@ -123,9 +123,12 @@ class ProductTemplate:
 
     company_id: Optional[int] = None
     warehouse_id: Optional[int] = None
-    
+
     property_account_income_id: Optional[int | str] = None
     property_account_expense_id: Optional[int | str] = None
+
+    # CFDI (SAT) — ClaveProdServ, added by contabilidad_mx_edi. Dropped when None.
+    mx_edi_product_code: Optional[str] = None
 # 'selection': [['consu', 'Goods'],
 #             ['service', 'Service'],
 #             ['combo', 'Combo']],

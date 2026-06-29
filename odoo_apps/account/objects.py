@@ -280,6 +280,10 @@ class Invoice:
     currency_id: int = 33  # MXN
     journal_id: Optional[int] = None
     company_id: Optional[int] = None
+    # CFDI (SAT) — added by contabilidad_mx_edi. Dropped from payload when None.
+    mx_edi_usage: Optional[str] = None
+    mx_edi_payment_way: Optional[str] = None
+    mx_edi_payment_policy: Optional[str] = None
     id: Optional[int] = None
 
     def __post_init__(self):

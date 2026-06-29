@@ -36,6 +36,11 @@ class Partner:
     # RFC
     vat: str = False
 
+    # CFDI (SAT) — fields added by contabilidad_mx_edi. Optional/None so they are
+    # dropped from the create payload when unset (and on DBs without the module).
+    mx_edi_fiscal_regime: Optional[str] = None
+    mx_edi_usage: Optional[str] = None
+
     street: str = False
     street2: str = False
     zip: str = False
